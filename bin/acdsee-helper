@@ -13,13 +13,13 @@ from colorama import Fore, Style
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 
+
 LR_SUBJECT_TAG = 'Xmp.lr.hierarchicalSubject'
 ACDSEE_CATEGORIES_TAG = 'Xmp.acdsee.categories'
 PERSON_TAG = 'Xmp.iptcExt.PersonInImage'
 EVENT_TAG = 'Xmp.iptcExt.Event'
 SUBJECT_TAG = 'Xmp.dc.subject'
 KEYWORDS_TAG = 'Xmp.acdsee.keywords'
-
 COLORS = {
     'red': Fore.RED,
     'green': Fore.GREEN,
@@ -31,11 +31,6 @@ STYLES = {
     'bold': Style.BRIGHT,
 }
 
-pp = pprint.PrettyPrinter(indent=4)
-changed_files = set()
-changed_config = False
-changed_files_lock = threading.Lock()
-
 
 # Read out the command line.
 parser = argparse.ArgumentParser(prog="acdsee-helper")
@@ -45,27 +40,38 @@ parser.add_argument("-c", "--config", action="store",
                     help="config file to use")
 parser.add_argument("-d", "--dry-run", action="store_true",
                     help="don't really do any work")
+parser.add_argument("-k", "--keywords-file", action="store",
+                    help="ACDSee exported keywords file to read")
 parser.add_argument("-n", "--no-color", action="store_true",
                     help="don't use colours")
 parser.add_argument("-v", "--verbose", action="count", default=0,
                     help="turn on more output")
+parser.add_argument("-p", "--dump-people", action="store_true",
+                    help="do nothing, just dump people")
 parser.add_argument("-x", "--dump-xmp", action="store_true",
-                    help="just dump xmp")
+                    help="do nothing, just dump xmp")
 parser.add_argument("filename", nargs="*",
                     help="files to update, no files enters watching mode")
 args = parser.parse_args()
 
-base = args.base
-verbose = args.verbose
-dry_run = args.dry_run
-no_color = args.no_color
-dump_xmp = args.dump_xmp
-file_names = args.filename
-config_file = args.config
+base_ = args.base
+verbose_ = args.verbose
+dry_run_ = args.dry_run
+no_color_ = args.no_color
+dump_xmp_ = args.dump_xmp
+key_words_ = args.keywords_file
+file_names_ = args.filename
+config_file_ = args.config
+dump_people_ = args.dump_people
+
+changed_files_ = set()
+changed_files_lock_ = threading.Lock()
+unknowns_ = set()
+
+pp = pprint.PrettyPrinter(indent=4)
 
 
 class Config:
-
     def __init__(self, file_name):
         self._file_name = file_name
         self._config = {}
@@ -76,7 +82,7 @@ class Config:
         if base is None:
             base = []
         if depth == 0:
-            self._build_people_map(entries['people'], 1, ['People'])
+            self._build_people_map(entries, 1, ['People'])
             return
         for entry in entries:
             if type(entry) is dict:
@@ -85,15 +91,53 @@ class Config:
             else:
                 self._people[entry.lower()] = '|'.join(base + [entry])
 
+    def _keywords_to_people(self, lines, current_depth):
+        entries = []
+        last = None
+
+        # Loop until we detect a return to a previous level or we run out of lines.
+        while len(lines) > 0:
+            line = lines[0]
+            sline = line.strip()
+            depth = len(line) - len(sline) - 1
+
+            # Going down a level. Update last entry in array to the return value.
+            if depth > current_depth:
+                entries[-1] = {last: self._keywords_to_people(lines, current_depth + 1)}
+
+            # At current level. Add in the end of entries and save value, just
+            # incase we have to drop down a level.
+            elif depth == current_depth:
+                last = sline
+                lines.pop(0)
+                entries.append(sline)
+
+            # Previous level. Return what we have.
+            elif depth < current_depth:
+                return entries
+
+        # Ran out of lines. Return what we have.
+        return entries
+
     def load(self):
         if self._file_name is not None:
+            print(color("loading config", fg='yellow'))
             with open(self._file_name, 'r') as config_file:
                 try:
                     self._config = yaml.safe_load(config_file)
                 except yaml.YAMLError as exc:
                     print(color(f'failed to read config: {exc}', fg="red"))
+
+        if self.keyword_file is not None:
+            with open(self.keyword_file, 'r') as keyword_file:
+                lines = keyword_file.readlines()
+            for entry in self._keywords_to_people(lines, 0):
+                if type(entry) is dict:
+                    if 'People' in entry:
+                        self._build_people_map(entry['People'])
+
         if 'people' in self._config:
-            self._build_people_map(self._config)
+            self._build_people_map(self._config['people'])
 
     def people_to_keywords(self, entries, depth=0):
         if depth == 0:
@@ -107,6 +151,13 @@ class Config:
                     self.people_to_keywords(entry[sub_entry], depth + 1)
             else:
                 print(('\t' * depth) + entry)
+
+    def keywords_to_people(self, lines):
+        for entry in self._keywords_to_people(lines, 0):
+            if type(entry) is dict:
+                if 'People' in entry:
+                    return entry['People']
+        return {}
 
     def name_to_keywords(self, name):
         return self._people.get(name.lower(), None)
@@ -124,56 +175,80 @@ class Config:
         return self._config.get('global', {}).get('unknown-prefix', 'Unknown')
 
     @property
+    def update_delay(self):
+        return self._config.get('global', {}).get('update-delay', 5)
+
+    @property
     def file_patterns(self):
         return self._config.get('global', {}).get('file-patterns',
                                                   ["*.xmp", "*.tif", "*.tiff", "*.jpg", "*.jpeg"])
 
+    @property
+    def config_file(self):
+        return self._file_name
+
+    @property
+    def keyword_file(self):
+        if key_words_ is not None:
+            return key_words_
+        return self._config.get('global', {}).get('keywords-file', None)
+
+    def is_data_file(self, file):
+        for pattern in self.file_patterns:
+            if fnmatch.fnmatch(file, pattern):
+                return True
+        return False
+
+    def is_config_file(self, file):
+        return file == self._file_name or file == self.keyword_file
+
+    def dump_people(self):
+        pp.pprint(self._people)
+
 
 class ExifFileHandler(PatternMatchingEventHandler):
-
     def __init__(self, config):
         super().__init__()
         self._config = config
 
     def is_match(self, event):
-        src = event.src_path.lower()
-        for pattern in self._config.file_patterns:
-            if fnmatch.fnmatch(src, pattern):
-                return True
-        return False
+        return self._config.is_data_file(event.src_path)
 
     def on_modified(self, event):
         if self.is_match(event):
-            with changed_files_lock:
-                global changed_files
-                changed_files.add(event.src_path)
+            with changed_files_lock_:
+                global changed_files_
+                changed_files_.add(event.src_path)
 
     def on_closed(self, event):
         if self.is_match(event):
-            with changed_files_lock:
-                global changed_files
-                changed_files.add(event.src_path)
+            with changed_files_lock_:
+                global changed_files_
+                changed_files_.add(event.src_path)
 
 
 class ConfigFileHandler(PatternMatchingEventHandler):
-
     def __init__(self, config):
         super().__init__()
         self._config = config
 
     def on_modified(self, event):
-        with changed_files_lock:
-            global changed_config
-            changed_config = True
+        with changed_files_lock_:
+            global changed_files_
+            changed_files_.add(event.src_path)
+            # global changed_config_
+            # changed_config_ = True
 
     def on_closed(self, event):
-        with changed_files_lock:
-            global changed_config
-            changed_config = True
+        with changed_files_lock_:
+            global changed_files_
+            changed_files_.add(event.src_path)
+            # global changed_config_
+            # changed_config_ = True
 
 
 def color(msg, fg=None, style=None):
-    if no_color:
+    if no_color_:
         return msg
     colors = ""
     if fg is not None and fg in COLORS:
@@ -218,16 +293,13 @@ def get_event(_config, exif):
     return None
 
 
-unknowns = set()
-
-
 def reset_unknown_people():
-    global unknowns
-    unknowns = set()
+    global unknowns_
+    unknowns_ = set()
 
 
 def _parse_area(config, exif):
-    global unknowns
+    global unknowns_
     people = []
     keywords = []
     i = 1
@@ -239,8 +311,8 @@ def _parse_area(config, exif):
             if keyword is not None:
                 keywords.append(keyword)
             else:
-                if name not in unknowns:
-                    unknowns.add(name)
+                if name not in unknowns_:
+                    unknowns_.add(name)
                     print(color(f" missing person config for {name}", fg='yellow'))
                 keywords.append(f'{config.people_prefix}|{config.unknown_prefix}|{name}')
         i = i + 1
@@ -306,9 +378,9 @@ def tidy_meta_data(config, file):
     # Fill in or clear out the changes.
     if not keywords:
         if LR_SUBJECT_TAG in data:
-            if verbose:
+            if verbose_:
                 print(color(f" removing {LR_SUBJECT_TAG}", fg='magenta'))
-            if not dry_run:
+            if not dry_run_:
                 image.modify_xmp({LR_SUBJECT_TAG: None})
     else:
         changes[LR_SUBJECT_TAG] = remove_duplicates(keywords)
@@ -316,27 +388,27 @@ def tidy_meta_data(config, file):
     if not subjects:
         if SUBJECT_TAG in data:
             if data[SUBJECT_TAG] != ['']:
-                if verbose:
+                if verbose_:
                     print(color(f" removing {SUBJECT_TAG}", fg='magenta'))
-                if not dry_run:
+                if not dry_run_:
                     image.modify_xmp({SUBJECT_TAG: ""})
     else:
         changes[SUBJECT_TAG] = remove_duplicates(subjects)
 
     if not people:
         if PERSON_TAG in data:
-            if verbose:
+            if verbose_:
                 print(color(f" removing {PERSON_TAG}", fg='magenta'))
-            if not dry_run:
+            if not dry_run_:
                 image.modify_xmp({PERSON_TAG: None})
     else:
         changes[PERSON_TAG] = remove_duplicates(people)
 
     if event is None:
         if EVENT_TAG in data:
-            if verbose:
+            if verbose_:
                 print(color(f" removing old {EVENT_TAG}", fg='magenta'))
-            if not dry_run:
+            if not dry_run_:
                 image.modify_xmp({EVENT_TAG: None})
     else:
         changes[EVENT_TAG] = {'lang="x-default"': event}
@@ -344,55 +416,71 @@ def tidy_meta_data(config, file):
     # We got changes so write them back.
     if changes != {} and changes != old_changes:
         print(color(f" pushing changes", fg='green'))
-        if verbose > 1:
+        if verbose_ > 1:
             print(color(f"from\n{pp.pformat(old_changes)}", fg='cyan'))
             print(color(f"to\n{pp.pformat(changes)}", fg='green'))
-        if not dry_run:
+        if not dry_run_:
             image.modify_xmp(changes)
 
-    if verbose:
+    if verbose_:
         print(color(f" finished", style='bold', fg='green'))
 
 
-config = Config(config_file)
+config_ = Config(config_file_)
 
-if len(file_names) > 0:
-    for file in file_names:
+if dump_people_:
+    config_.dump_people()
+
+elif len(file_names_) > 0:
+    for file in file_names_:
         try:
-            if dump_xmp:
+            if dump_xmp_:
                 dump_meta_data(file)
             else:
-                tidy_meta_data(config, file)
+                tidy_meta_data(config_, file)
         except Exception as e:
             print(color(f"{file}: error ({str(e)})", fg="red"))
 
 else:
-    print(args.base)
+    # Add watchers for directories and configuration.
     path = args.base if args.base is not None else '.'
-    event_handler = ExifFileHandler(config)
-    config_event_handler = ConfigFileHandler(config)
+    exif_handler = ExifFileHandler(config_)
+    config_handler = ConfigFileHandler(config_)
+
     observer = Observer()
-    observer.schedule(event_handler, path, recursive=True)
+    observer.schedule(exif_handler, path, recursive=True)
+    if config_.config_file is not None:
+        observer.schedule(config_handler, config_.config_file)
+    if config_.keyword_file is not None:
+        observer.schedule(config_handler, config_.keyword_file)
     observer.start()
+
     try:
         while True:
             time.sleep(1)
             too_soon = set()
-            with changed_files_lock:
-                files = changed_files
-                changed_files = set()
+            with changed_files_lock_:
+                files = changed_files_
+                changed_files_ = set()
+
             for file in files:
                 try:
-                    if file_age(file) < 5:
-                        if verbose:
+                    if file_age(file) < config_.update_delay:
+                        if verbose_:
                             print(color(f"{file}: too young", fg='yellow'))
                         too_soon.add(file)
-                    else:
-                        tidy_meta_data(config, file)
+                        continue
+
+                    if config_.is_data_file(file):
+                        tidy_meta_data(config_, file)
+                    if config_.is_config_file(file):
+                        config_.load()
+
                 except Exception as e:
                     print(color(f"{file}: error ({str(e)})", fg="red"))
-            with changed_files_lock:
-                changed_files = changed_files.union(too_soon)
+
+            with changed_files_lock_:
+                changed_files_ = changed_files_.union(too_soon)
     finally:
         observer.stop()
         observer.join()
