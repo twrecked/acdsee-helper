@@ -1,0 +1,7 @@
+argparse
+colorama
+exiv2
+pyexiv2
+pyyaml
+watchdog
+xmltodict
