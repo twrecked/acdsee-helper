@@ -13,6 +13,7 @@ from colorama import Fore, Style
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 
+__version__ = "acdsee-helper v0.1"
 
 LR_SUBJECT_TAG = 'Xmp.lr.hierarchicalSubject'
 ACDSEE_CATEGORIES_TAG = 'Xmp.acdsee.categories'
@@ -20,6 +21,7 @@ PERSON_TAG = 'Xmp.iptcExt.PersonInImage'
 EVENT_TAG = 'Xmp.iptcExt.Event'
 SUBJECT_TAG = 'Xmp.dc.subject'
 KEYWORDS_TAG = 'Xmp.acdsee.keywords'
+CREATOR_TOOL_TAG = "Xmp.xmp.CreatorTool"
 COLORS = {
     'red': Fore.RED,
     'green': Fore.GREEN,
@@ -319,6 +321,10 @@ def _parse_area(config, exif):
     return people, keywords
 
 
+def get_creator(_config, exif):
+    return exif.get(CREATOR_TOOL_TAG, "Unknown")
+
+
 def get_people_in_image(config, exif):
     people = []
     for keyword in exif.get(KEYWORDS_TAG, []):
@@ -358,6 +364,8 @@ def tidy_meta_data(config, file):
 
     # Act on a file.
     print(color(f"{os.path.basename(file)}: processing", style='bold', fg='green'))
+    if verbose_:
+        print(color(f" created by {get_creator(config, data)}", fg='yellow'))
 
     # Save current values
     old_changes = {}
