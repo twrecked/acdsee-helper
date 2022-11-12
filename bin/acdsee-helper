@@ -85,6 +85,7 @@ class Config:
         self._file_name = file_name
         self._config = {}
         self._people = {}
+        self._exclude = []
         self.load()
 
     def _build_people_map(self, entries, depth=0, base=None):
@@ -148,6 +149,13 @@ class Config:
         if 'people' in self._config:
             self._build_people_map(self._config['people'])
 
+        if not self.keywords_event_included:
+            self._exclude.append(f'{self.event_prefix}|*')
+        if not self.keywords_people_included:
+            self._exclude.append(f'{self.people_prefix}|*')
+        for exclude in self.keywords_excluded:
+            self._exclude.append(f'{exclude}*')
+
     def people_to_keywords(self, entries, depth=0):
         if depth == 0:
             print(self.people_prefix)
@@ -171,6 +179,18 @@ class Config:
     def name_to_keywords(self, name):
         return self._people.get(name.lower(), None)
 
+    def remove_hidden(self, all_keywords):
+        keywords = []
+        for keyword in all_keywords:
+            add = True
+            for pattern in self._exclude:
+                if fnmatch.fnmatch(keyword, pattern):
+                    add = False
+                    break
+            if add:
+                keywords.append(keyword)
+        return keywords
+
     @property
     def event_prefix(self):
         return self._config.get('global', {}).get('event-prefix', 'Events')
@@ -184,16 +204,24 @@ class Config:
         return self._config.get('global', {}).get('event-separator', ', ')
 
     @property
-    def event_include(self):
-        return self._config.get('global', {}).get('event-include', True)
-
-    @property
     def people_prefix(self):
         return self._config.get('global', {}).get('people-prefix', 'People')
 
     @property
-    def unknown_prefix(self):
+    def people_unknown_prefix(self):
         return self._config.get('global', {}).get('people-unknown-prefix', 'Unknown')
+
+    @property
+    def keywords_event_included(self):
+        return self._config.get('global', {}).get('keywords-event-included', True)
+
+    @property
+    def keywords_people_included(self):
+        return self._config.get('global', {}).get('keywords-people-included', True)
+
+    @property
+    def keywords_excluded(self):
+        return self._config.get('global', {}).get('keywords-excludeed', [])
 
     @property
     def update_delay(self):
@@ -343,7 +371,7 @@ def _parse_area(config, exif):
                 if name not in unknowns_:
                     unknowns_.add(name)
                     print(color(f" missing person config for {name}", fg='yellow'))
-                keywords.append(f'{config.people_prefix}|{config.unknown_prefix}|{name}')
+                keywords.append(f'{config.people_prefix}|{config.people_unknown_prefix}|{name}')
         i = i + 1
     return people, keywords
 
@@ -366,9 +394,8 @@ def get_people_in_image(config, exif):
 
 def get_keywords(config, exif):
     keywords = exif.get(KEYWORDS_TAG, [])
-    # TODO remove event and people if asked for
     apeople, akeywords = _parse_area(config, exif)
-    keywords = remove_duplicates(keywords + akeywords)
+    keywords = config.remove_hidden(remove_duplicates(keywords + akeywords))
     return keywords
 
 
