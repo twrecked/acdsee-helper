@@ -8,7 +8,7 @@ import threading
 import yaml
 import argparse
 import pyexiv2
-import xmltodict
+# import xmltodict
 from colorama import Fore, Style
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
@@ -73,6 +73,13 @@ unknowns_ = set()
 pp = pprint.PrettyPrinter(indent=4)
 
 
+def to_list(possible_list):
+    if type(possible_list) is list:
+        return possible_list
+    else:
+        return [possible_list]
+
+
 class Config:
     def __init__(self, file_name):
         self._file_name = file_name
@@ -97,7 +104,7 @@ class Config:
         entries = []
         last = None
 
-        # Loop until we detect a return to a previous level or we run out of lines.
+        # Loop until we detect a return to a previous level, or we run out of lines.
         while len(lines) > 0:
             line = lines[0]
             sline = line.strip()
@@ -165,8 +172,20 @@ class Config:
         return self._people.get(name.lower(), None)
 
     @property
-    def event_category(self):
-        return self._config.get('global', {}).get('event-category', 'Events')
+    def event_prefix(self):
+        return self._config.get('global', {}).get('event-prefix', 'Events')
+
+    @property
+    def event_tag_count(self):
+        return self._config.get('global', {}).get('event-tag-count', -1)
+
+    @property
+    def event_separator(self):
+        return self._config.get('global', {}).get('event-separator', ', ')
+
+    @property
+    def event_include(self):
+        return self._config.get('global', {}).get('event-include', True)
 
     @property
     def people_prefix(self):
@@ -174,7 +193,7 @@ class Config:
 
     @property
     def unknown_prefix(self):
-        return self._config.get('global', {}).get('unknown-prefix', 'Unknown')
+        return self._config.get('global', {}).get('people-unknown-prefix', 'Unknown')
 
     @property
     def update_delay(self):
@@ -281,18 +300,26 @@ def _get_event(category):
     return _get_event(next_category)
 
 
-def get_event(_config, exif):
-    categories = exif.get(ACDSEE_CATEGORIES_TAG, '')
-    if len(categories) > 0:
-        try:
-            for key, value in xmltodict.parse(categories)['Categories'].items():
-                if value.get('#text', '') == 'Events':
-                    event = _get_event(value)
-                    if event is not None:
-                        return event
-        except Exception as e:
-            print(color(f'failed to read category: {str(e)}', fg="red"))
+def get_event(config, exif):
+    # Try in keywords field.
+    for keyword in exif.get(KEYWORDS_TAG, []):
+        topics = keyword.split('|')
+        if topics[0].lower() == config.event_prefix.lower():
+            return config.event_separator.join(to_list(topics[config.event_tag_count:]))
     return None
+
+    # Fall though here?
+    # categories = exif.get(ACDSEE_CATEGORIES_TAG, '')
+    # if len(categories) > 0:
+    #     try:
+    #         for key, value in xmltodict.parse(categories)['Categories'].items():
+    #             if value.get('#text', '') == 'Events':
+    #                 event = _get_event(value)
+    #                 if event is not None:
+    #                     return event
+    #     except Exception as e:
+    #         print(color(f'failed to read category: {str(e)}', fg="red"))
+    # return None
 
 
 def reset_unknown_people():
@@ -339,7 +366,7 @@ def get_people_in_image(config, exif):
 
 def get_keywords(config, exif):
     keywords = exif.get(KEYWORDS_TAG, [])
-
+    # TODO remove event and people if asked for
     apeople, akeywords = _parse_area(config, exif)
     keywords = remove_duplicates(keywords + akeywords)
     return keywords
