@@ -18,6 +18,7 @@ class MetaData:
         self._image = pyexiv2.Image(file_name)
         self._data = self._image.read_xmp()
         self._unknowns = set()
+        self._pp = pprint.PrettyPrinter(indent=4)
 
         self._old_data = {}
         self._new_data = {}
@@ -93,35 +94,48 @@ class MetaData:
         return self._old_data != self._new_data
 
     def set_event(self, new_event):
-        if not new_event and self._config.verbose:
+        if not new_event and EVENT_TAG in self._old_data and self._config.verbose:
             print(color(f" removing {EVENT_TAG}", fg='magenta'))
         self._new_data[EVENT_TAG] = new_event
 
     def set_keywords(self, new_keywords):
-        if not new_keywords and self._config.verbose:
+        if not new_keywords and LR_SUBJECT_TAG in self._old_data and self._config.verbose:
             print(color(f" removing {LR_SUBJECT_TAG}", fg='magenta'))
         self._new_data[LR_SUBJECT_TAG] = new_keywords
 
     def set_subjects(self, new_subjects):
-        if not new_subjects and self._config.verbose:
+        if not new_subjects and SUBJECT_TAG in self._old_data and self._config.verbose:
             print(color(f" removing {SUBJECT_TAG}", fg='magenta'))
         if not new_subjects:
             new_subjects = ""
         self._new_data[SUBJECT_TAG] = new_subjects
 
     def set_people(self, new_people):
-        if not new_people and self._config.verbose:
+        if not new_people and PERSON_TAG in self._old_data and self._config.verbose:
             print(color(f" removing {PERSON_TAG}", fg='magenta'))
         self._new_data[PERSON_TAG] = new_people
 
-    def write_changes(self, force=False):
-        if force or self.needs_update:
-            print("would update")
-
     def tidy_up(self):
-        print(color(f"{os.path.basename(self._file_name)}: processing", style='bold', fg='green'))
+        print(color(f"{os.path.basename(self._file_name)}: processing", fg='green'))
         if self._config.verbose:
             print(color(f" created by {self.get_creator}", fg='yellow'))
+
+        self.set_event(self.get_event)
+        self.set_keywords(self.get_keywords)
+        self.set_subjects(self.get_subjects)
+        self.set_people(self.get_people)
+        self.write_changes()
+
+        if self._config.verbose:
+            print(color(f" finished", style='bold', fg='green'))
+
+    def write_changes(self, force=False):
+        if force or self.needs_update:
+            print(color(f" writing changes", fg='green'))
+            if self._config.very_verbose:
+                print(color(f" from\n{self._pp.pformat(self._old_data)}", fg='cyan'))
+                print(color(f" to\n{self._pp.pformat(self._new_data)}", fg='green'))
+            self._old_data = self._new_data
 
     def dump(self):
         pp = pprint.PrettyPrinter(indent=4)

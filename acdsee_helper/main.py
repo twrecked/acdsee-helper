@@ -14,9 +14,7 @@ if __name__ == '__main__':
 
     for file in c.file_names:
         m = metadata.MetaData(c, file)
-        print(color(f"need-uddating: {m.needs_update}", fg='yellow'))
         m.tidy_up()
-        print(color(f"need-uddating: {m.needs_update}", fg='yellow'))
         # m.dump()
         # m.write_changes()
 
