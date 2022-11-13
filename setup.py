@@ -10,9 +10,9 @@ def readme():
 
 setup(
 
-    name='acdsee-helper',
+    name='acdsee_helper',
     version='0.1a1',
-    packages=['acdsee-helper'],
+    packages=['acdsee_helper'],
 
     python_requires='>=3.8',
     install_requires=[
@@ -27,7 +27,7 @@ setup(
 
     author='Steve Herrell',
     author_email='steve.herrell@gmail.com',
-    description='acdsee-helper is a scipt that massages exif information between ACDSee and DXO Photolab.',
+    description='acdsee_helper is a scipt that massages exif information between ACDSee and DXO Photolab.',
     long_description=readme(),
     long_description_content_type='text/markdown',
     license='LGPLv3+',
@@ -39,9 +39,9 @@ setup(
         'lightroom',
         'python',
     ],
-    url='https://github.com/twrecked/acdsee-helper'
+    url='https://github.com/twrecked/acdsee-helper',
     project_urls={
-        "Bug Tracker": 'https://github.com/twrecked/acdsee-helper/issues'
+        "Bug Tracker": 'https://github.com/twrecked/acdsee-helper/issues',
         "Documentation": 'https://github.com/twrecked/acdsee-helper/blob/main/README.md',
         "Source Code": 'https://github.com/twrecked/acdsee-helper',
 
