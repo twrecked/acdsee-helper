@@ -1,7 +1,10 @@
-argparse
-colorama
+argparse~=1.4.0
+colorama~=0.4.6
 exiv2
-pyexiv2
-pyyaml
+pyexiv2~=2.8.1
+pyyaml~=6.0
 watchdog
 xmltodict
+
+geopy~=2.3.0
+setuptools~=44.0.0

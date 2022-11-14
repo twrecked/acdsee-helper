@@ -4,6 +4,7 @@ from . import const
 from . import config
 from . import keywords
 from . import metadata
+from . import geocode
 
 from .color import color, disable_color
 
@@ -23,4 +24,8 @@ if __name__ == '__main__':
     # pp.pprint(k)
     #
     # keywords.write_adcsee_keyword_file("ignored", k)
+
+    locator = geocode.get_locator()
+    pp.pprint(locator.get_exif_info((27.218010289369108, -82.4555909962064)))
+    pp.pprint(locator.get_exif_info(( 53.00504349607705, -2.3400134355823763)))
 
