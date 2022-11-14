@@ -12,5 +12,5 @@ if __name__ == '__main__':
         m = metadata.MetaData(c, file)
         m.fix_up()
         m.fix_up_geo()
-        m.dump()
+        # m.dump()
         m.write_changes()

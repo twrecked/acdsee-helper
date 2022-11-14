@@ -132,10 +132,10 @@ class MetaData:
 
     def set_subjects(self, new_subjects):
         if not new_subjects:
-            if DC_SUBJECT_TAG in self._old_data:
+            if DC_SUBJECT_TAG in self._old_data and self._old_data[DC_SUBJECT_TAG] != ['']:
                 if self._config.verbose:
                     print(color(f" removing {DC_SUBJECT_TAG}", fg='magenta'))
-            self._new_data[DC_SUBJECT_TAG] = None
+                self._new_data[DC_SUBJECT_TAG] = ['']
         else:
             self._new_data[DC_SUBJECT_TAG] = new_subjects
 
