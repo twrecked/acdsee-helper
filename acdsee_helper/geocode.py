@@ -1,7 +1,14 @@
+import pprint
 
 from geopy.geocoders import GoogleV3
 
 from .color import color
+
+GEOCODE_COUNTRY_CODE_TAG = 'country_code'
+GEOCODE_LOCATION_TAG = 'location'
+GEOCODE_CITY_TAG = 'city'
+GEOCODE_COUNTRY_TAG = 'country'
+GEOCODE_STATE_TAG = 'state'
 
 
 class NullGeoLocator:
@@ -21,24 +28,28 @@ class GoogleGeoLocator:
     ADDRESS_MAPPING = [
         # Add a mapping if needed...
         # {'countries': ['GB'],
-        #  'country': 'administrative_area_level_1',
-        #  'state': 'administrative_area_level_2',
-        #  'city': 'postal_town',
-        #  'location': 'route'
+        #  GEOCODE_COUNTRY_TAG: 'administrative_area_level_1',
+        #  GEOCODE_STATE_TAG: 'administrative_area_level_2',
+        #  GEOCODE_CITY_TAG: 'postal_town',
+        #  GEOCODE_LOCATION_TAG: 'route'
         #  },
         {'countries': [],
-         'country': 'country',
-         'state': 'administrative_area_level_1',
-         'city': 'locality',
-         'location': 'route'
+         GEOCODE_COUNTRY_TAG: 'country',
+         GEOCODE_STATE_TAG: 'administrative_area_level_1',
+         GEOCODE_CITY_TAG: 'locality',
+         GEOCODE_LOCATION_TAG: 'route'
          },
     ]
 
-    def __init__(self, api_key):
-        self._locator = GoogleV3(api_key)
+    def __init__(self, config):
+        self._config = config
+        self._locator = GoogleV3(self._config.geocode_token)
 
     def reverse(self, coords):
-        return self._locator.reverse(coords)
+        reverse = self._locator.reverse(coords)
+        if not reverse:
+            print(color('error, missing a piece off GEO information', fg='red'))
+        return reverse
 
     def decode_address(self, raw_location):
         address = raw_location['address_components']
@@ -52,16 +63,21 @@ class GoogleGeoLocator:
             if country_code in mapping['countries'] or not mapping['countries']:
                 break
 
-        pieces = {'country_code': country_code}
+        pieces = {GEOCODE_COUNTRY_CODE_TAG: country_code}
         for piece in mapping:
             for component in address:
                 if mapping[piece] in component['types']:
                     pieces[piece] = component['long_name']
                     break
 
+        # Make sure it looks sane.
+        if len(pieces) != 5:
+            print(color(f'error, missing a piece of GEO information {len(pieces)}', fg='red'))
+            return {}
         return pieces
 
     def get_exif_info(self, coords):
+        # TODO look for this in a cache
         raw_location = self.reverse(coords).raw
         if raw_location:
             return self.decode_address(raw_location)
@@ -70,7 +86,7 @@ class GoogleGeoLocator:
 
 def get_locator(config):
     if config.geocode_backend == 'google':
-        return GoogleGeoLocator(api_key="AIzaSyDLf6VaaZ2qzD7aQUeE4SHKpJICyWru3Sc")
+        return GoogleGeoLocator(config)
     return NullGeoLocator()
 
 

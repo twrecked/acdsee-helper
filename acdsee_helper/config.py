@@ -146,8 +146,8 @@ class Config:
         return self._config.get('global', {}).get('people-prefix', 'People')
 
     @property
-    def file_names(self):
-        return self._args.filename
+    def places_prefix(self):
+        return self._config.get('global', {}).get('places-prefix', 'Places')
 
     @property
     def people_unknown_prefix(self):
@@ -162,12 +162,28 @@ class Config:
         return self._config.get('global', {}).get('keywords-people-included', True)
 
     @property
+    def keywords_location_included(self):
+        return self._config.get('global', {}).get('keywords-location-included', True)
+
+    @property
     def keywords_excluded(self):
         return self._config.get('global', {}).get('keywords-excluded', [])
 
     @property
+    def geocode_backend(self):
+        return self._config.get('global', {}).get('geocode-backend', [])
+
+    @property
+    def geocode_token(self):
+        return self._config.get('global', {}).get('geocode-token', [])
+
+    @property
     def update_delay(self):
         return self._config.get('global', {}).get('update-delay', 5)
+
+    @property
+    def file_names(self):
+        return self._args.filename
 
     @property
     def file_patterns(self):

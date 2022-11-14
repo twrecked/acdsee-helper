@@ -64,3 +64,7 @@ def write_adcsee_keyword_file(file, keywords):
     keywords = "\n".join(_yaml_to_keywords(keywords, 0))
     with io.open(file, 'w', newline='\r\n') as kfile:
         kfile.writelines(keywords)
+
+
+def geo_entries_to_keyword(geo_entries):
+    pass
