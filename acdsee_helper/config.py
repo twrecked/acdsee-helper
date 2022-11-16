@@ -14,6 +14,7 @@ class Config:
     def __init__(self):
         self._args = None
         self._config = {}
+        self._keywords = {}
         self._people = {}
         self._exclude = []
         self.load()
@@ -53,15 +54,15 @@ class Config:
 
     def _load_keywords(self):
         if self.keyword_file is not None:
-            self._acdsee = keywords.acdsee_file_to_hash(self.keyword_file)
+            self._keywords = keywords.acdsee_file_to_hash(self.keyword_file)
 
     def _load_people(self):
         people = {}
         if 'people' in self._config:
             people = keywords.yaml_to_hash(self._config['people'])
             people = keywords.hash_to_keywords(people)
-        if self.people_prefix in self._acdsee:
-            people.update(keywords.hash_to_keywords(self._acdsee[self.people_prefix]))
+        if self.people_prefix in self._keywords:
+            people.update(keywords.hash_to_keywords(self._keywords[self.people_prefix]))
         self._build_people_map(people)
 
     def _load_exclusions(self):
@@ -131,6 +132,10 @@ class Config:
         return self._args.base
 
     @property
+    def events(self):
+        return self._keywords.get(self.event_prefix, {})
+    
+    @property
     def event_prefix(self):
         return self._config.get('global', {}).get('event-prefix', 'Events')
 
@@ -143,8 +148,16 @@ class Config:
         return self._config.get('global', {}).get('event-separator', ', ')
 
     @property
+    def people(self):
+        return self._people
+
+    @property
     def people_prefix(self):
         return self._config.get('global', {}).get('people-prefix', 'People')
+
+    @property
+    def places(self):
+        return self._keywords.get(self.places_prefix, {})
 
     @property
     def places_prefix(self):
@@ -218,7 +231,7 @@ class Config:
         print(color("config:", fg='green'))
         pp.pprint(self._config)
         print(color("keywords_:", fg='green'))
-        pp.pprint(self._acdsee)
+        pp.pprint(self._keywords)
         print(color("people:", fg='green'))
         pp.pprint(self._people)
         print(color("exclude:", fg='green'))
