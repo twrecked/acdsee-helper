@@ -9,7 +9,6 @@ from .color import color
 from .util import remove_duplicates, to_list
 from . import geocode
 
-
 BACKUP_TAGS = [LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, DC_SUBJECT_TAG, IPTC_GEO_COUNTRY_CODE_TAG,
                IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, PS_GEO_STATE_TAG]
 
@@ -20,6 +19,7 @@ def acdsee_region_entry(i, entry):
 
 class MetaData:
     def __init__(self, config, file_name):
+        self._msg = ''
         self._config = config
         self._file_name = file_name
         self._image = pyexiv2.Image(file_name)
@@ -33,7 +33,6 @@ class MetaData:
             if keyword in self._data:
                 self._old_data[keyword] = self._data[keyword]
                 self._new_data[keyword] = self._data[keyword]
-        pass
 
     def _parse_area(self):
         people = []
@@ -87,6 +86,14 @@ class MetaData:
         return keywords
 
     @property
+    def get_all_keywords(self):
+        keywords = self._data.get(ACDSEE_KEYWORDS_TAG, [])
+        lkeywords = self._new_data.get(LR_SUBJECT_TAG, [])
+        apeople, akeywords = self._parse_area()
+        keywords = remove_duplicates(keywords + lkeywords + akeywords)
+        return keywords
+
+    @property
     def get_subjects(self):
         subjects = []
         for keyword in self.get_keywords:
@@ -119,7 +126,7 @@ class MetaData:
                     print(color(f" removing {IPTCEXT_EVENT_TAG}", fg='magenta'))
                 self._new_data[IPTCEXT_EVENT_TAG] = None
         else:
-            self._new_data[IPTCEXT_EVENT_TAG] = { 'lang="x-default"': new_event }
+            self._new_data[IPTCEXT_EVENT_TAG] = {'lang="x-default"': new_event}
 
     def set_keywords(self, new_keywords):
         if not new_keywords:
@@ -148,21 +155,25 @@ class MetaData:
         else:
             self._new_data[IPTCEXT_PERSON_TAG] = new_people
 
+    def fix_up_start(self):
+        print(color(f"{os.path.basename(self._file_name)}:", style='bold', fg='green'))
+        self._msg = ''
+
+    def fix_up_finished(self):
+        if self._config.verbose:
+            print(color(f" finished{self._msg}", style='bold', fg='green'))
+
     def fix_up(self):
-        print(color(f"{os.path.basename(self._file_name)}: processing (tags)", fg='green'))
+        print(color(f" processing tags", fg='green'))
 
         self.set_event(self.get_event)
         self.set_keywords(self.get_keywords)
         self.set_subjects(self.get_subjects)
         self.set_people(self.get_people)
 
-        if self._config.verbose:
-            print(color(f" finished", style='bold', fg='green'))
-
     def fix_up_geo(self):
-        print(color(f"{os.path.basename(self._file_name)}: processing (geo)", fg='green'))
+        print(color(f" processing GPS data", fg='green'))
 
-        msg = " (no coords, nothing to do)"
         latitude, longitude = self.get_geo_coords
         if latitude and longitude:
             locator = geocode.get_locator(self._config)
@@ -174,18 +185,19 @@ class MetaData:
                 self._new_data[PS_GEO_COUNTRY_TAG] = geo_tags['country']
                 self._new_data[PS_GEO_STATE_TAG] = geo_tags['state']
 
-                keyword = "|".join([self._config.places_prefix, geo_tags.get('country'), geo_tags.get('state'),
-                                    geo_tags.get('city')])
-                if self._config.keywords_location_included:
-                    keyword = "|".join([keyword, geo_tags.get('location')])
-                self.set_keywords(self.get_keywords + [keyword])
-
-                msg = ""
+                keywords = [self._config.places_prefix]
+                for tag in ['country', 'state', 'city']:
+                    if geo_tags.get(tag) is not None:
+                        keywords.append(geo_tags.get(tag))
+                if self._config.keywords_location_included and geo_tags.get('location') is not None:
+                    keywords.append(geo_tags.get('location'))
+                if len(keywords) > 1:
+                    keyword = "|".join(keywords)
+                    self.set_keywords(self.get_keywords + [keyword])
             else:
-                msg = " (couldn't get details)"
-                
-        if self._config.verbose:
-            print(color(f" finished{msg}", style='bold', fg='green'))
+                self._msg = " (couldn't get details)"
+        else:
+            self._msg = " (no coords, nothing to do)"
 
     def write_changes(self, force=False):
         if force or self.needs_update:
@@ -196,16 +208,18 @@ class MetaData:
                 print(color(f" writing changes", fg='green'))
                 self._image.modify_xmp(self._new_data)
             else:
-                print(color(f" pretending to write changes", fg='green'))
+                self._msg = ' (but only pretending to write)'
 
             self._old_data = self._new_data
 
-    def dump(self):
-        pp = pprint.PrettyPrinter(indent=4)
+    def dump_xmp(self):
         print(color("xmp:", fg='green'))
-        pp.pprint(self._data)
+        self._pp.pprint(self._data)
+
+    def dump(self):
+        self.dump_xmp()
         print(color("original-data:", fg='green'))
-        pp.pprint(self._old_data)
+        self._pp.pprint(self._old_data)
         print(color("new-data:", fg='green'))
-        pp.pprint(self._new_data)
+        self._pp.pprint(self._new_data)
         print(color(f"needs-updating: {self.needs_update}", fg='yellow'))

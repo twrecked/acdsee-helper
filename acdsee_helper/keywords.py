@@ -1,70 +1,124 @@
 import io
+import pprint
 
 from .color import color
 
+pp = pprint.PrettyPrinter(indent=4)
 
-# Format from YAML is an array of hashes/names.
+""" Formats
+We store and manipulate the keywords in several format.
 
-def _keywords_to_yaml(lines, current_depth=0):
-    entries = []
-    last = None
+- yaml; as returned from the YAML parser, this comes from the config file
+- acdsee; a tab separated list, this comes from the exported keyword file
+- dictionary; as a dictionary with None for empty branches, we build this from
+  the previous entries
+- keywords: list of '|' symbol separated hierarchical keywords, we build this from
+  the dictionary
+"""
+
+
+def _hash_to_acdsee(acdsee, hash, depth):
+    for topic, value in hash.items():
+        acdsee.append(('\t' * depth) + topic)
+        if value is not None:
+            _hash_to_acdsee(acdsee, value, depth + 1)
+
+
+def _hash_to_keywords(keywords, hash, base):
+    for topic, value in hash.items():
+        if value is not None:
+            _hash_to_keywords(keywords, value, base + [topic])
+        else:
+            keywords.add('|'.join(base + [topic]))
+
+
+def keywords_to_hash(keywords):
+    acdsee = {}
+    keywords = list(set(keywords))
+    keywords.sort()
+    for keyword in keywords:
+        current_hash = acdsee
+        topics = keyword.split('|')
+        for index in range(len(topics)):
+            topic = topics[index]
+            if index == len(topics) - 1:
+                if topic not in current_hash:
+                    current_hash[topic] = None
+            else:
+                if topic in current_hash:
+                    if type(current_hash[topic]) != dict:
+                        current_hash[topic] = {}
+                else:
+                    current_hash[topic] = {}
+                current_hash = current_hash[topic]
+    return acdsee
+
+
+def hash_to_keywords(hash):
+    keywords = set()
+    _hash_to_keywords(keywords, hash, [])
+    return keywords
+
+
+def hash_to_acdsee(hash):
+    acdsee = []
+    _hash_to_acdsee(acdsee, hash, 0)
+    return acdsee
+
+
+def hash_to_acsdee_file(hash, file):
+    acdsee = "\n".join(hash_to_acdsee(hash))
+    with io.open(file, 'w', newline='\r\n') as afile:
+        afile.writelines(acdsee)
+
+
+def acdsee_to_hash(lines, depth=0):
+    entries = {}
 
     # Loop until we detect a return to a previous level, or we run out of lines.
+    last = None
     while len(lines) > 0:
         line = lines[0]
         sline = line.strip()
-        depth = len(line) - len(sline) - 1
+        new_depth = len(line) - len(sline) - 1
 
         # Going down a level. Update last entry in array to the return value.
-        if depth > current_depth:
-            entries[-1] = {last: _keywords_to_yaml(lines, current_depth + 1)}
+        if new_depth > depth:
+            entries[last] = acdsee_to_hash(lines, depth + 1)
 
         # At current level. Add in the end of entries and save value, just
         # incase we have to drop down a level.
-        elif depth == current_depth:
+        elif new_depth == depth:
+            entries[sline] = None
             last = sline
             lines.pop(0)
-            entries.append(sline)
 
         # Previous level. Return what we have.
-        elif depth < current_depth:
+        elif new_depth < depth:
             return entries
 
     # Ran out of lines. Return what we have.
     return entries
 
 
-def _yaml_to_keywords(keywords, depth):
-    lines = []
-    for keyword in keywords:
-        if type(keyword) is dict:
-            for sub_keyword in keyword:
-                lines.append(('\t' * depth) + sub_keyword)
-                lines = lines + _yaml_to_keywords(keyword[sub_keyword], depth + 1)
-        else:
-            lines.append(('\t' * depth) + keyword)
-    return lines
-
-
-def read_adcsee_keyword_file(file, base_keyword=None):
+def acdsee_file_to_hash(file, topic=None):
     with open(file, 'r') as keyword_file:
         lines = keyword_file.readlines()
-    keywords = _keywords_to_yaml(lines)
-    if base_keyword is None:
+    keywords = acdsee_to_hash(lines)
+    if topic is None:
         return keywords
-    for entry in keywords:
-        if type(entry) is dict:
-            if base_keyword in entry:
-                return entry[base_keyword]
-    print(color(f'no "{base_keyword}" section detected', fg='red'))
+    if topic in keywords:
+        return keywords[topic]
+    print(color(f'no "{topic}" section detected', fg='red'))
     return None
 
 
-def write_adcsee_keyword_file(file, keywords):
-    keywords = "\n".join(_yaml_to_keywords(keywords, 0))
-    with io.open(file, 'w', newline='\r\n') as kfile:
-        kfile.writelines(keywords)
-
-
-def geo_entries_to_keyword(geo_entries):
-    pass
+def yaml_to_hash(entries):
+    khash = {}
+    for entry in entries:
+        if type(entry) is dict:
+            for topic, value in entry.items():
+                khash[topic] = yaml_to_hash(value)
+        else:
+            khash[entry] = None
+    return khash

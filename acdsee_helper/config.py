@@ -35,7 +35,9 @@ class Config:
         parser.add_argument("-p", "--dump-people", action="store_true",
                             help="do nothing, just dump people")
         parser.add_argument("-x", "--dump-xmp", action="store_true",
-                            help="do nothing, just dump xmp")
+                            help="do nothing, just dump xmp of file")
+        parser.add_argument("-C", "--check-keywords", action="store_true",
+                            help="check keywords in file against configued ones")
         parser.add_argument("filename", nargs="*",
                             help="files to update, no files enters watching mode")
         self._args = parser.parse_args()
@@ -51,13 +53,16 @@ class Config:
 
     def _load_keywords(self):
         if self.keyword_file is not None:
-            words = keywords.read_adcsee_keyword_file(self.keyword_file, self.people_prefix)
-            if words is not None:
-                self._build_people_map(words)
+            self._acdsee = keywords.acdsee_file_to_hash(self.keyword_file)
 
     def _load_people(self):
+        people = {}
         if 'people' in self._config:
-            self._build_people_map(self._config['people'])
+            people = keywords.yaml_to_hash(self._config['people'])
+            people = keywords.hash_to_keywords(people)
+        if self.people_prefix in self._acdsee:
+            people.update(keywords.hash_to_keywords(self._acdsee[self.people_prefix]))
+        self._build_people_map(people)
 
     def _load_exclusions(self):
         if not self.keywords_event_included:
@@ -67,18 +72,10 @@ class Config:
         for exclude in self.keywords_excluded:
             self._exclude.append(f'{exclude}*')
 
-    def _build_people_map(self, entries, depth=0, base=None):
-        if base is None:
-            base = []
-        if depth == 0:
-            self._build_people_map(entries, 1, ['People'])
-            return
+    def _build_people_map(self, entries):
         for entry in entries:
-            if type(entry) is dict:
-                for sub_entry in entry:
-                    self._build_people_map(entry[sub_entry], depth + 1, base + [sub_entry])
-            else:
-                self._people[entry.lower()] = '|'.join(base + [entry])
+            topics = entry.split('|')
+            self._people[topics[-1].lower()] = f'{self.people_prefix}|{entry}'
 
     def _setup_colors(self):
         if self._args.no_color:
@@ -111,6 +108,10 @@ class Config:
 
     @property
     def mode(self):
+        if self._args.dump_xmp:
+            return "dump"
+        if self._args.check_keywords:
+            return "check-keywords"
         return "fix"
 
     @property
@@ -178,6 +179,10 @@ class Config:
         return self._config.get('global', {}).get('geocode-token', [])
 
     @property
+    def geocode_coalesce(self):
+        return self._config.get('global', {}).get('geocode-coalesce', 250)
+
+    @property
     def update_delay(self):
         return self._config.get('global', {}).get('update-delay', 5)
 
@@ -212,9 +217,10 @@ class Config:
     def dump(self):
         print(color("config:", fg='green'))
         pp.pprint(self._config)
+        print(color("keywords_:", fg='green'))
+        pp.pprint(self._acdsee)
         print(color("people:", fg='green'))
         pp.pprint(self._people)
         print(color("exclude:", fg='green'))
         pp.pprint(self._exclude)
-
 
