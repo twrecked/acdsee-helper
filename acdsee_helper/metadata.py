@@ -188,7 +188,6 @@ class MetaData:
 
     def fix_up(self):
         info(f" processing tags")
-
         self.set_event(self.get_event)
         self.set_keywords(self.get_keywords)
         self.set_subjects(self.get_subjects)
@@ -196,14 +195,14 @@ class MetaData:
 
     def fix_up_geo(self):
         info(f" processing GPS data")
-
         latitude, longitude = self.get_geo_coords
         if latitude and longitude:
             locator = geocode.get_locator(self._config)
             geo_tags = locator.get_exif_info((latitude, longitude))
             if geo_tags:
 
-                # Convert geocode tags to exif tags. Handle empty tags smartly.
+                # Convert geocode tags to exif tags. Handle empty tags smartly, if it
+                # isn't present then don't add a `None` entry.
                 for tag, value in geo_tags.items():
                     exif_tag = geo_tag_to_exif(tag)
                     if value is None:
