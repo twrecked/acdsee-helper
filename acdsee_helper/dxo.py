@@ -4,7 +4,7 @@ import shutil
 
 from . import config
 from . import metadata
-from .color import color, vprint
+from .color import vprint
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -28,22 +28,22 @@ if __name__ == '__main__':
             new_file = f'{new_dir}/{basename}'
 
             if c.dry_run:
-                vprint(color(f" would copy {file} to {new_file}", fg='green'))
-                vprint(color(f" and replace {model} with {mapped_to}", fg='green'))
+                vprint(f" would copy {file} to {new_file}")
+                vprint(f" and replace {model} with {mapped_to}")
                 continue
 
             if not os.path.exists(new_file):
-                vprint(color(f" creating {new_dir}", fg='green'))
+                vprint(f" creating {new_dir}")
                 os.makedirs(new_dir, exist_ok=True)
 
             if os.path.exists(new_file):
-                vprint(color(f" copying {file} over {new_file}", fg='green'))
+                vprint(f" copying {file} over {new_file}")
                 os.remove(new_file)
             else:
-                vprint(color(f" copying {file} to {new_file}", fg='green'))
+                vprint(f" copying {file} to {new_file}")
             shutil.copy(file, new_file)
 
-            vprint(color(f" and replacing '{model}' with '{mapped_to['model']}'", fg='green'))
+            vprint(f" and replacing '{model}' with '{mapped_to['model']}'")
             nm = metadata.MetaData(c, new_file)
             nm.set_make_model(mapped_to['make'], mapped_to['model'])
 

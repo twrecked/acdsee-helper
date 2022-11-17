@@ -37,14 +37,26 @@ def enable_color():
     no_color_ = False
 
 
-def vprint(msg):
+def info(msg, fg='green', style='normal'):
+    print(color(f'{msg}', fg=fg, style=style))
+
+
+def warn(msg):
+    print(color(f' {msg}', fg='yellow', style='bold'))
+
+
+def error(msg):
+    print(color(f' {msg}', fg='red', style='bold'))
+
+
+def vprint(msg, fg='green', style='normal'):
     if verbose_ > 0:
-        print(f' {msg}')
+        print(color(f' {msg}', fg=fg, style=style))
 
 
-def vvprint(msg):
+def vvprint(msg, fg='yellow', style='normal'):
     if verbose_ > 1:
-        print(f' {msg}')
+        print(color(f' {msg}', fg=fg, style=style))
 
 
 def set_verbosity(level):

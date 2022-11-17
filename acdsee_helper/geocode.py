@@ -2,7 +2,7 @@ from unidecode import unidecode
 from geopy.geocoders import GoogleV3
 from geopy import distance
 
-from .color import color, vprint, vvprint
+from .color import warn, error, vprint, vvprint
 
 """Reverse Lookup a set of latitude/longitude coordinates.
 
@@ -33,13 +33,13 @@ class GeoCache:
 
     def check(self, new_coords):
         if self._coalesce == 0:
-            vvprint(color(" not caching!", fg="yellow"))
+            vvprint("not caching!")
             return None
 
         for cached_coords, details in self._cache.items():
             meters = distance.distance(cached_coords, new_coords).meters
             if meters < self._coalesce:
-                vprint(color(" found a GPS entry", fg="green"))
+                vprint("found a GPS entry")
                 return details
 
         return None
@@ -53,7 +53,7 @@ geo_cache_ = None
 
 class NullGeoLocator:
     def _error(self):
-        print(color("no geocode device configured", fg='red'))
+        error("no geocode device configured")
 
     def reverse(self, _coords):
         self._error()
@@ -96,7 +96,7 @@ class GoogleGeoLocator:
             if reverse:
                 self._cache.update(coords, reverse)
         if not reverse:
-            print(color('error, missing GEO information', fg='red'))
+            warn('error, missing GEO information')
         return reverse
 
     def decode_address(self, raw_location):
@@ -106,7 +106,7 @@ class GoogleGeoLocator:
             if 'country' in component['types']:
                 country_code = component['short_name']
         if country_code == '':
-            print(color(f'error, no country found', fg='red'))
+            error(f'error, no country found')
             return {}
 
         mapping = {}
