@@ -17,10 +17,7 @@ pp = pprint.PrettyPrinter(indent=4)
 #
 if __name__ == '__main__':
 
-    c = config.Config()
-
-    pp.pprint(c.people)
-    sys.exit(0)
+    c = config.HelperConfig()
 
     all_keywords = []
 
@@ -28,7 +25,9 @@ if __name__ == '__main__':
         m = metadata.MetaData(c, file)
         m.fix_up_start()
         if c.mode == 'dump':
-            m.dump_xmp()
+            #  m.dump_exif()
+            m.dump2()
+            pp.pprint(m.get_make_model)
         elif c.mode == 'check-keywords':
             # XXX no reprocessing here...
             # m.fix_up()

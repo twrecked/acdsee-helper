@@ -2,7 +2,7 @@ from unidecode import unidecode
 from geopy.geocoders import GoogleV3
 from geopy import distance
 
-from .color import color
+from .color import color, vprint, vvprint
 
 GEOCODE_COUNTRY_CODE_TAG = 'country_code'
 GEOCODE_LOCATION_TAG = 'location'
@@ -19,13 +19,13 @@ class GeoCache:
 
     def check(self, new_coords):
         if self._coalesce == 0:
-            print(color("not caching!", fg="yellow"))
+            vvprint(color(" not caching!", fg="yellow"))
             return None
 
         for cached_coords, details in self._cache.items():
             meters = distance.distance(cached_coords, new_coords).meters
             if meters < self._coalesce:
-                print(color("found one!", fg="red"))
+                vprint(color(" found a GPS entry", fg="green"))
                 return details
 
         return None

@@ -13,6 +13,7 @@ STYLES = {
 }
 
 no_color_ = False
+verbose_ = 0
 
 
 def color(msg, fg=None, style=None):
@@ -34,3 +35,18 @@ def disable_color():
 def enable_color():
     global no_color_
     no_color_ = False
+
+
+def vprint(msg):
+    if verbose_ > 0:
+        print(msg)
+
+
+def vvprint(msg):
+    if verbose_ > 1:
+        print(msg)
+
+
+def set_verbosity(level):
+    global verbose_
+    verbose_ = level
