@@ -4,35 +4,84 @@ import yaml
 import fnmatch
 import argparse
 
-from .color import color, disable_color, enable_color
+from .color import color, disable_color, enable_color, set_verbosity
 from . import keywords
 
 pp = pprint.PrettyPrinter(indent=4)
 
 
-class Config:
-    def __init__(self):
+class BaseConfig:
+    def __init__(self, name):
         self._args = None
+        self._name = name
         self._config = {}
+
+    def _create_parser(self):
+        parser = argparse.ArgumentParser(prog=self._name)
+        parser.add_argument("-c", "--config-file", action="store",
+                            help="config file to use")
+        parser.add_argument("-d", "--dry-run", action="store_true",
+                            help="don't really do any work")
+        parser.add_argument("-n", "--no-color", action="store_true",
+                            help="don't use colours")
+        parser.add_argument("-v", "--verbose", action="count", default=0,
+                            help="turn on more output")
+        return parser
+
+    def _setup_output(self):
+        set_verbosity(self._args.verbose)
+        if self._args.no_color:
+            disable_color()
+        else:
+            enable_color()
+
+    def _load_config(self):
+        if self.config_file is not None:
+            with open(self.config_file, 'r') as config_file:
+                try:
+                    self._config = yaml.safe_load(config_file)
+                except yaml.YAMLError as exc:
+                    print(color(f'failed to read config: {exc}', fg="red"))
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def config_file(self):
+        return self._args.config_file
+
+    @property
+    def verbose(self):
+        return self._args.verbose > 0
+
+    @property
+    def very_verbose(self):
+        return self._args.verbose > 1
+
+    @property
+    def dry_run(self):
+        return self._args.dry_run
+
+    def dump(self):
+        print(color(f"config (for {self.name}):", fg='green'))
+        pp.pprint(self._config)
+
+
+class HelperConfig(BaseConfig):
+    def __init__(self):
+        super().__init__('acdsee-helper')
         self._keywords = {}
         self._people = {}
         self._exclude = []
         self.load()
 
     def _load_args(self):
-        parser = argparse.ArgumentParser(prog="acdsee_helper")
+        parser = self._create_parser()
         parser.add_argument("-b", "--base", action="store",
                             help="base directory to monitor")
-        parser.add_argument("-c", "--config-file", action="store",
-                            help="config file to use")
-        parser.add_argument("-d", "--dry-run", action="store_true",
-                            help="don't really do any work")
         parser.add_argument("-k", "--keywords-file", action="store",
                             help="ACDSee exported keywords file to read")
-        parser.add_argument("-n", "--no-color", action="store_true",
-                            help="don't use colours")
-        parser.add_argument("-v", "--verbose", action="count", default=0,
-                            help="turn on more output")
         parser.add_argument("-p", "--dump-people", action="store_true",
                             help="do nothing, just dump people")
         parser.add_argument("-x", "--dump-xmp", action="store_true",
@@ -42,15 +91,6 @@ class Config:
         parser.add_argument("filename", nargs="*",
                             help="files to update, no files enters watching mode")
         self._args = parser.parse_args()
-
-    def _load_config(self):
-        if self.config_file is not None:
-            print(color("loading config", fg='yellow'))
-            with open(self.config_file, 'r') as config_file:
-                try:
-                    self._config = yaml.safe_load(config_file)
-                except yaml.YAMLError as exc:
-                    print(color(f'failed to read config: {exc}', fg="red"))
 
     def _load_keywords(self):
         if self.keyword_file is not None:
@@ -78,19 +118,13 @@ class Config:
             topics = entry.split('|')
             self._people[topics[-1].lower()] = f'{self.people_prefix}|{entry}'
 
-    def _setup_colors(self):
-        if self._args.no_color:
-            disable_color()
-        else:
-            enable_color()
-
     def load(self):
         self._load_args()
         self._load_config()
         self._load_keywords()
         self._load_people()
         self._load_exclusions()
-        self._setup_colors()
+        self._setup_output()
 
     def name_to_keywords(self, name):
         return self._people.get(name.lower(), None)
@@ -116,25 +150,13 @@ class Config:
         return "fix"
 
     @property
-    def verbose(self):
-        return self._args.verbose > 0
-
-    @property
-    def very_verbose(self):
-        return self._args.verbose > 1
-
-    @property
-    def dry_run(self):
-        return self._args.dry_run
-
-    @property
     def base_directory(self):
         return self._args.base
 
     @property
     def events(self):
         return self._keywords.get(self.event_prefix, {})
-    
+
     @property
     def event_prefix(self):
         return self._config.get('global', {}).get('event-prefix', 'Events')
@@ -209,10 +231,6 @@ class Config:
                                                   ["*.xmp", "*.tif", "*.tiff", "*.jpg", "*.jpeg"])
 
     @property
-    def config_file(self):
-        return self._args.config_file
-
-    @property
     def keyword_file(self):
         if self._args.keywords_file is not None:
             return self._args.keywords_file
@@ -228,12 +246,39 @@ class Config:
         return file == self.config_file or file == self.keyword_file
 
     def dump(self):
-        print(color("config:", fg='green'))
-        pp.pprint(self._config)
-        print(color("keywords_:", fg='green'))
-        pp.pprint(self._keywords)
-        print(color("people:", fg='green'))
-        pp.pprint(self._people)
-        print(color("exclude:", fg='green'))
-        pp.pprint(self._exclude)
+        super().dump()
+        #  print(color("keywords_:", fg='green'))
+        #  pp.pprint(self._keywords)
+        #  print(color("people:", fg='green'))
+        #  pp.pprint(self._people)
+        #  print(color("exclude:", fg='green'))
+        #  pp.pprint(self._exclude)
 
+
+class DxoConfig(BaseConfig):
+    def __init__(self):
+        super().__init__('dxo-helper')
+        self.load()
+
+    def _load_args(self):
+        parser = self._create_parser()
+        parser.add_argument("filename", nargs="*",
+                            help="files to update, no files enters watching mode")
+        self._args = parser.parse_args()
+
+    def load(self):
+        self._load_args()
+        self._load_config()
+        self._setup_output()
+
+    @property
+    def fake_dir(self):
+        return self._config.get('global', {}).get('fake-dir', None)
+
+    @property
+    def models(self):
+        return self._config.get('models', {})
+
+    @property
+    def file_names(self):
+        return self._args.filename
