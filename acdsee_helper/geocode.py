@@ -4,6 +4,20 @@ from geopy import distance
 
 from .color import color, vprint, vvprint
 
+"""Reverse Lookup a set of latitude/longitude coordinates.
+
+If all goes well it will return a dictionary with 5 elements:
+    country_code: 2 letter country code, eg CA
+    country: Long country name, eg Canada
+    state: Long state/province name, eg Ontario
+    city: City name, eg Ottawa
+    location: A street name, eg Bank St
+    
+It may be possible for 'location' to be missing. And note, the code returns
+`EXIF` agnostic keys.
+"""
+
+
 GEOCODE_COUNTRY_CODE_TAG = 'country_code'
 GEOCODE_LOCATION_TAG = 'location'
 GEOCODE_CITY_TAG = 'city'

@@ -39,12 +39,12 @@ def enable_color():
 
 def vprint(msg):
     if verbose_ > 0:
-        print(msg)
+        print(f' {msg}')
 
 
 def vvprint(msg):
     if verbose_ > 1:
-        print(msg)
+        print(f' {msg}')
 
 
 def set_verbosity(level):

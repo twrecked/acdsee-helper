@@ -6,15 +6,32 @@ from .const import XMP_CREATOR_TOOL_TAG, ACDSEE_KEYWORDS_TAG, LR_SUBJECT_TAG, IP
     DC_SUBJECT_TAG, EXIF_GPS_LATITUDE_TAG, EXIF_GPS_LONGITUDE_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, \
     IPTC_GEO_COUNTRY_CODE_TAG, IPTC_GEO_LOCATION_TAG, PS_GEO_STATE_TAG, EXIF_MAKE_TAG, EXIF_MODEL_TAG
 from .color import color, vprint, vvprint
+from .geocode import GEOCODE_COUNTRY_CODE_TAG, GEOCODE_LOCATION_TAG, GEOCODE_CITY_TAG, GEOCODE_COUNTRY_TAG, \
+    GEOCODE_STATE_TAG
 from .util import remove_duplicates, to_list
 from . import geocode
 
 BACKUP_TAGS = [LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, DC_SUBJECT_TAG, IPTC_GEO_COUNTRY_CODE_TAG,
                IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, PS_GEO_STATE_TAG]
 
+GEO_TAGS = [IPTC_GEO_COUNTRY_CODE_TAG, IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG,
+            PS_GEO_STATE_TAG]
+
+GEO_TAGS_TO_EXIF = {
+    GEOCODE_COUNTRY_CODE_TAG: IPTC_GEO_COUNTRY_CODE_TAG,
+    GEOCODE_LOCATION_TAG: IPTC_GEO_LOCATION_TAG,
+    GEOCODE_CITY_TAG: PS_GEO_CITY_TAG,
+    GEOCODE_COUNTRY_TAG: PS_GEO_COUNTRY_TAG,
+    GEOCODE_STATE_TAG: PS_GEO_STATE_TAG
+}
+
 
 def acdsee_region_entry(i, entry):
     return f'Xmp.acdsee-rs.Regions/acdsee-rs:RegionList[{i}]/acdsee-rs:{entry}'
+
+
+def geo_tag_to_exif(tag):
+    return GEO_TAGS_TO_EXIF.get(tag, None)
 
 
 class MetaData:
@@ -185,12 +202,20 @@ class MetaData:
             locator = geocode.get_locator(self._config)
             geo_tags = locator.get_exif_info((latitude, longitude))
             if geo_tags:
-                self._new_data[IPTC_GEO_COUNTRY_CODE_TAG] = geo_tags['country_code']
-                self._new_data[IPTC_GEO_LOCATION_TAG] = geo_tags['location']
-                self._new_data[PS_GEO_CITY_TAG] = geo_tags['city']
-                self._new_data[PS_GEO_COUNTRY_TAG] = geo_tags['country']
-                self._new_data[PS_GEO_STATE_TAG] = geo_tags['state']
 
+                # Convert geocode tags to exif tags. Handle empty tags smartly.
+                for tag, value in geo_tags.items():
+                    exif_tag = geo_tag_to_exif(tag)
+                    if value is None:
+                        if exif_tag in self._old_data:
+                            self._new_data[exif_tag] = None
+                            vprint(color(f'removing {tag}', fg='magenta'))
+                        else:
+                            vprint(color(f'ignoring removed {tag}', fg='magenta'))
+                    else:
+                        self._new_data[exif_tag] = value
+
+                # Build the places keywords.
                 keywords = [self._config.places_prefix]
                 for tag in ['country', 'state', 'city']:
                     if geo_tags.get(tag) is not None:
