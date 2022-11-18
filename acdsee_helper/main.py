@@ -38,6 +38,7 @@ if __name__ == '__main__':
         else:
             m.fix_up()
             m.fix_up_geo()
+            # m.dump()
             m.write_changes()
         m.fix_up_finished()
 

@@ -5,16 +5,33 @@ import pyexiv2
 from .const import XMP_CREATOR_TOOL_TAG, ACDSEE_KEYWORDS_TAG, LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, \
     DC_SUBJECT_TAG, EXIF_GPS_LATITUDE_TAG, EXIF_GPS_LONGITUDE_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, \
     IPTC_GEO_COUNTRY_CODE_TAG, IPTC_GEO_LOCATION_TAG, PS_GEO_STATE_TAG, EXIF_MAKE_TAG, EXIF_MODEL_TAG
-from .color import color, vprint, vvprint
+from .color import info, warn, error, vprint, vvprint
+from .geocode import GEOCODE_COUNTRY_CODE_TAG, GEOCODE_LOCATION_TAG, GEOCODE_CITY_TAG, GEOCODE_COUNTRY_TAG, \
+    GEOCODE_STATE_TAG
 from .util import remove_duplicates, to_list
 from . import geocode
 
 BACKUP_TAGS = [LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, DC_SUBJECT_TAG, IPTC_GEO_COUNTRY_CODE_TAG,
                IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, PS_GEO_STATE_TAG]
 
+GEO_TAGS = [IPTC_GEO_COUNTRY_CODE_TAG, IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG,
+            PS_GEO_STATE_TAG]
+
+GEO_TAGS_TO_EXIF = {
+    GEOCODE_COUNTRY_CODE_TAG: IPTC_GEO_COUNTRY_CODE_TAG,
+    GEOCODE_LOCATION_TAG: IPTC_GEO_LOCATION_TAG,
+    GEOCODE_CITY_TAG: PS_GEO_CITY_TAG,
+    GEOCODE_COUNTRY_TAG: PS_GEO_COUNTRY_TAG,
+    GEOCODE_STATE_TAG: PS_GEO_STATE_TAG
+}
+
 
 def acdsee_region_entry(i, entry):
     return f'Xmp.acdsee-rs.Regions/acdsee-rs:RegionList[{i}]/acdsee-rs:{entry}'
+
+
+def geo_tag_to_exif(tag):
+    return GEO_TAGS_TO_EXIF.get(tag, None)
 
 
 class MetaData:
@@ -52,7 +69,7 @@ class MetaData:
                 else:
                     if name not in self._unknowns:
                         self._unknowns.add(name)
-                        print(color(f" missing person config for {name}", fg='yellow'))
+                        warn(f" missing person config for {name}")
                     keywords.append(f'{self._config.people_prefix}|{self._config.people_unknown_prefix}|{name}')
             i = i + 1
         return people, keywords
@@ -130,7 +147,7 @@ class MetaData:
     def set_event(self, new_event):
         if not new_event:
             if IPTCEXT_EVENT_TAG in self._old_data:
-                vprint(color(f" removing {IPTCEXT_EVENT_TAG}", fg='magenta'))
+                vprint(f" removing {IPTCEXT_EVENT_TAG}", fg='magenta')
                 self._new_data[IPTCEXT_EVENT_TAG] = None
         else:
             self._new_data[IPTCEXT_EVENT_TAG] = {'lang="x-default"': new_event}
@@ -138,7 +155,7 @@ class MetaData:
     def set_keywords(self, new_keywords):
         if not new_keywords:
             if LR_SUBJECT_TAG in self._old_data:
-                vprint(color(f" removing {LR_SUBJECT_TAG}", fg='magenta'))
+                vprint(f" removing {LR_SUBJECT_TAG}", fg='magenta')
                 self._new_data[LR_SUBJECT_TAG] = None
         else:
             self._new_data[LR_SUBJECT_TAG] = new_keywords
@@ -146,7 +163,7 @@ class MetaData:
     def set_subjects(self, new_subjects):
         if not new_subjects:
             if DC_SUBJECT_TAG in self._old_data and self._old_data[DC_SUBJECT_TAG] != ['']:
-                vprint(color(f" removing {DC_SUBJECT_TAG}", fg='magenta'))
+                vprint(f" removing {DC_SUBJECT_TAG}", fg='magenta')
                 self._new_data[DC_SUBJECT_TAG] = ['']
         else:
             self._new_data[DC_SUBJECT_TAG] = new_subjects
@@ -154,7 +171,7 @@ class MetaData:
     def set_people(self, new_people):
         if not new_people:
             if IPTCEXT_PERSON_TAG in self._old_data:
-                vprint(color(f" removing {IPTCEXT_PERSON_TAG}", fg='magenta'))
+                vprint(f" removing {IPTCEXT_PERSON_TAG}", fg='magenta')
                 self._new_data[IPTCEXT_PERSON_TAG] = None
         else:
             self._new_data[IPTCEXT_PERSON_TAG] = new_people
@@ -163,34 +180,41 @@ class MetaData:
         self._image.modify_exif({EXIF_MAKE_TAG: make, EXIF_MODEL_TAG: model})
 
     def fix_up_start(self):
-        print(color(f"{os.path.basename(self._file_name)}:", style='bold', fg='green'))
+        info(f"{os.path.basename(self._file_name)}:", style='bold')
         self._msg = ''
 
     def fix_up_finished(self):
-        vprint(color(f"finished{self._msg}", style='bold', fg='green'))
+        vprint(f"finished{self._msg}", style='bold')
 
     def fix_up(self):
-        print(color(f" processing tags", fg='green'))
-
+        info(f" processing tags")
         self.set_event(self.get_event)
         self.set_keywords(self.get_keywords)
         self.set_subjects(self.get_subjects)
         self.set_people(self.get_people)
 
     def fix_up_geo(self):
-        print(color(f" processing GPS data", fg='green'))
-
+        info(f" processing GPS data")
         latitude, longitude = self.get_geo_coords
         if latitude and longitude:
             locator = geocode.get_locator(self._config)
             geo_tags = locator.get_exif_info((latitude, longitude))
             if geo_tags:
-                self._new_data[IPTC_GEO_COUNTRY_CODE_TAG] = geo_tags['country_code']
-                self._new_data[IPTC_GEO_LOCATION_TAG] = geo_tags['location']
-                self._new_data[PS_GEO_CITY_TAG] = geo_tags['city']
-                self._new_data[PS_GEO_COUNTRY_TAG] = geo_tags['country']
-                self._new_data[PS_GEO_STATE_TAG] = geo_tags['state']
 
+                # Convert geocode tags to exif tags. Handle empty tags smartly, if it
+                # isn't present then don't add a `None` entry.
+                for tag, value in geo_tags.items():
+                    exif_tag = geo_tag_to_exif(tag)
+                    if value is None:
+                        if exif_tag in self._old_data:
+                            self._new_data[exif_tag] = None
+                            vprint(f'removing {tag}', fg='magenta')
+                        else:
+                            vprint(f'ignoring removed {tag}', fg='magenta')
+                    else:
+                        self._new_data[exif_tag] = value
+
+                # Build the places keywords.
                 keywords = [self._config.places_prefix]
                 for tag in ['country', 'state', 'city']:
                     if geo_tags.get(tag) is not None:
@@ -207,10 +231,10 @@ class MetaData:
 
     def write_changes(self, force=False):
         if force or self.needs_update:
-            vvprint(color(f" from\n{self._pp.pformat(self._old_data)}", fg='cyan'))
-            vvprint(color(f" to\n{self._pp.pformat(self._new_data)}", fg='green'))
+            vvprint(f" from\n{self._pp.pformat(self._old_data)}", fg='cyan')
+            vvprint(f" to\n{self._pp.pformat(self._new_data)}", fg='green')
             if not self._config.dry_run:
-                print(color(f" writing changes", fg='green'))
+                info(" writing changes")
                 self._image.modify_xmp(self._new_data)
             else:
                 self._msg = ' (but only pretending to write)'
@@ -218,20 +242,17 @@ class MetaData:
             self._old_data = self._new_data
 
     def dump_xmp(self):
-        print(color("xmp:", fg='green'))
+        info("xmp:")
         self._pp.pprint(self._data)
 
     def dump_exif(self):
-        print(color("exif:", fg='green'))
+        info("exif:")
         self._pp.pprint(self._exif)
 
     def dump(self):
         self.dump_xmp()
-        print(color("original-data:", fg='green'))
+        info("original-data:")
         self._pp.pprint(self._old_data)
-        print(color("new-data:", fg='green'))
+        info("new-data:")
         self._pp.pprint(self._new_data)
-        print(color(f"needs-updating: {self.needs_update}", fg='yellow'))
-
-    def dump2(self):
-        print(self._exif.get("Exif.Image.Model", "UNKNOWN"))
+        info(f"needs-updating: {self.needs_update}")
