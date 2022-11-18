@@ -218,6 +218,10 @@ class HelperConfig(BaseConfig):
         return self._config.get('global', {}).get('geocode-coalesce', 250)
 
     @property
+    def geocode_unidecode(self):
+        return self._config.get('global', {}).get('geocode-unidecode', False)
+
+    @property
     def update_delay(self):
         return self._config.get('global', {}).get('update-delay', 5)
 

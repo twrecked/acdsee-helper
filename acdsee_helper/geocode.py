@@ -26,6 +26,12 @@ GEOCODE_STATE_TAG = 'state'
 
 
 class GeoCache:
+    """Location caching.
+
+    User can set a distance to see if a 'rough' area has been queried before.
+    This will prevent too many look-ups from happening.
+    """
+
     def __init__(self, config):
         self._config = config
         self._coalesce = config.geocode_coalesce
@@ -51,20 +57,76 @@ class GeoCache:
 geo_cache_ = None
 
 
-class NullGeoLocator:
-    def _error(self):
-        error("no geocode device configured")
+class BaseGeoLocator:
+    """Base Geo Locator class.
 
-    def reverse(self, _coords):
-        self._error()
-        return {}
+    They all have to provide the `reverse`, `decode_address` class.
+    """
+
+    def __init__(self, config, locator):
+        self._config = config
+        self._locator = locator
+
+        global geo_cache_
+        if geo_cache_ is None:
+            geo_cache_ = GeoCache(config)
+        self._cache = geo_cache_
+
+    def _squash(self, msg):
+        """Remove unicode characters.
+        This is entirely optional, but I've found a few places near me that
+        use accents and don't use accents for the same component. This just
+        squashes them into one.
+
+        :param msg: The message to squash.
+        :return: Unidecoded message.
+        """
+        if self._config.geocode_unidecode:
+            return unidecode(msg)
+        return msg
+
+    def reverse(self, coords):
+        reverse = self._cache.check(coords)
+        if reverse is None:
+            reverse = self._locator.reverse(coords)
+            if reverse:
+                self._cache.update(coords, reverse)
+        if reverse is None:
+            warn('error, missing GEO information')
+        return reverse
 
     def decode_address(self, _raw_location):
-        self._error()
-        return {}
+        return None
+
+    def get_exif_info(self, coords):
+        """Reverse look up and decode in one.
+
+        :param coords Coordinates tuple to look for
+        :return Place description of None on failure.
+        """
+        location = self.reverse(coords)
+        if location is not None:
+            return self.decode_address(location.raw)
+        return None
 
 
-class GoogleGeoLocator:
+class NullGeoLocator(BaseGeoLocator):
+    def __init__(self, config):
+        super().__init__(config, None)
+
+    def reverse(self, _coords):
+        error("reverse, no geocode device configured")
+        return None
+
+    def decode_address(self, _raw_location):
+        error("decode, no geocode device configured")
+        return None
+
+
+class GoogleGeoLocator(BaseGeoLocator):
+    """The Google version of the GeoLocator.
+    """
+
     ADDRESS_MAPPING = [
         # Add a mapping if needed...
         # {'countries': ['GB'],
@@ -82,24 +144,12 @@ class GoogleGeoLocator:
     ]
 
     def __init__(self, config):
-        global geo_cache_
-        self._config = config
-        self._locator = GoogleV3(self._config.geocode_token)
-        if geo_cache_ is None:
-            geo_cache_ = GeoCache(config)
-        self._cache = geo_cache_
-
-    def reverse(self, coords):
-        reverse = self._cache.check(coords)
-        if not reverse:
-            reverse = self._locator.reverse(coords)
-            if reverse:
-                self._cache.update(coords, reverse)
-        if not reverse:
-            warn('error, missing GEO information')
-        return reverse
+        super().__init__(config, GoogleV3(config.geocode_token))
 
     def decode_address(self, raw_location):
+
+        # Decode the location and check it looks somewhat sane, in that is has a
+        # country code.
         address = raw_location['address_components']
         country_code = ""
         for component in address:
@@ -109,11 +159,14 @@ class GoogleGeoLocator:
             error(f'error, no country found')
             return {}
 
+        # Pick the handler to map geolocator to the components we are intersted
+        # in.
         mapping = {}
         for mapping in self.ADDRESS_MAPPING:
             if country_code in mapping['countries'] or not mapping['countries']:
                 break
 
+        # Extract the components. We make unreturned components None.
         pieces = {GEOCODE_COUNTRY_CODE_TAG: country_code,
                   GEOCODE_COUNTRY_TAG: None,
                   GEOCODE_STATE_TAG: None,
@@ -122,26 +175,25 @@ class GoogleGeoLocator:
         for piece in mapping:
             for component in address:
                 if mapping[piece] in component['types']:
-                    pieces[piece] = unidecode(component['long_name'])
+                    pieces[piece] = self._squash(component['long_name'])
                     break
 
         return pieces
 
-    def get_exif_info(self, coords):
-        # TODO look for this in a cache
-        raw_location = self.reverse(coords).raw
-        if raw_location:
-            return self.decode_address(raw_location)
-        return {}
-
 
 def get_locator(config):
+    """Get Locator determined byu config.
+
+    We currently on support Google.
+    """
     if config.geocode_backend == 'google':
         return GoogleGeoLocator(config)
-    return NullGeoLocator()
+    return NullGeoLocator(config)
 
 
 def unpack_gps(gps):
+    """Convert EXIF coordinates into GeoLocator compatible ones.
+    """
     multiplier = 1
     if gps.endswith('W') or gps.endswith('S'):
         gps = gps[:-1]
