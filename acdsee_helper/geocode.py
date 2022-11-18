@@ -129,12 +129,13 @@ class GoogleGeoLocator(BaseGeoLocator):
 
     ADDRESS_MAPPING = [
         # Add a mapping if needed...
-        # {'countries': ['GB'],
+        # {
+        #  'countries': ['GB'],
         #  GEOCODE_COUNTRY_TAG: 'administrative_area_level_1',
         #  GEOCODE_STATE_TAG: 'administrative_area_level_2',
         #  GEOCODE_CITY_TAG: 'postal_town',
         #  GEOCODE_LOCATION_TAG: 'route'
-        #  },
+        # },
         {'countries': [],
          GEOCODE_COUNTRY_TAG: 'country',
          GEOCODE_STATE_TAG: 'administrative_area_level_1',
