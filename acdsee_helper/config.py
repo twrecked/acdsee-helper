@@ -1,9 +1,7 @@
 
-import sys
 import pprint
 import yaml
 import fnmatch
-import argparse
 
 from .color import color, disable_color, enable_color, set_verbosity
 from . import keywords
@@ -52,6 +50,17 @@ class BaseConfig:
     def dry_run(self):
         return self._options['dry_run']
 
+    @property
+    def file_patterns(self):
+        return self._config.get('global', {}).get('file-patterns',
+                                                  ["*.xmp", "*.tif", "*.tiff", "*.jpg", "*.jpeg", "*.dng"])
+
+    def is_data_file(self, file):
+        for pattern in self.file_patterns:
+            if fnmatch.fnmatch(file, pattern):
+                return True
+        return False
+
     def dump(self):
         print(color(f"options (for {self.name}):", fg='green'))
         pp.pprint(self._options)
@@ -62,22 +71,22 @@ class BaseConfig:
 class ACDSeeConfig(BaseConfig):
     def __init__(self, options):
         super().__init__('acdsee-helper', options)
-        self._keywords = {}
+        self._keyword_hash = {}
         self._people = {}
         self._exclude = []
         self.load()
 
     def _load_keywords(self):
         if self.keyword_file is not None:
-            self._keywords = keywords.acdsee_file_to_hash(self.keyword_file)
+            self._keyword_hash = keywords.acdsee_file_to_hash(self.keyword_file)
 
     def _load_people(self):
         people = set()
         if 'people' in self._config:
             people = keywords.yaml_to_hash(self._config['people'])
             people = keywords.hash_to_keywords(people)
-        if self.people_prefix in self._keywords:
-            people.update(keywords.hash_to_keywords(self._keywords[self.people_prefix]))
+        if self.people_prefix in self._keyword_hash:
+            people.update(keywords.hash_to_keywords(self._keyword_hash[self.people_prefix]))
         self._build_people_map(people)
 
     def _load_exclusions(self):
@@ -115,13 +124,9 @@ class ACDSeeConfig(BaseConfig):
                 keywords.append(keyword)
         return keywords
 
-    # @property
-    # def base_directory(self):
-    #     return self._args.base
-
     @property
     def events(self):
-        return self._keywords.get(self.event_prefix, {})
+        return self._keyword_hash.get(self.event_prefix, {})
 
     @property
     def event_prefix(self):
@@ -145,7 +150,7 @@ class ACDSeeConfig(BaseConfig):
 
     @property
     def places(self):
-        return self._keywords.get(self.places_prefix, {})
+        return self._keyword_hash.get(self.places_prefix, {})
 
     @property
     def places_prefix(self):
@@ -169,7 +174,7 @@ class ACDSeeConfig(BaseConfig):
 
     @property
     def keywords(self):
-        return keywords.hash_to_keywords(self._keywords)
+        return keywords.hash_to_keywords(self._keyword_hash)
 
     @property
     def keywords_excluded(self):
@@ -195,26 +200,11 @@ class ACDSeeConfig(BaseConfig):
     def update_delay(self):
         return self._config.get('global', {}).get('update-delay', 5)
 
-    # @property
-    # def file_names(self):
-    #     return self._args.filename
-
-    @property
-    def file_patterns(self):
-        return self._config.get('global', {}).get('file-patterns',
-                                                  ["*.xmp", "*.tif", "*.tiff", "*.jpg", "*.jpeg", "*.dng"])
-
     @property
     def keyword_file(self):
         if self._options['keyword_file'] is not None:
             return self._options['keyword_file']
         return self._config.get('global', {}).get('keywords-file', None)
-
-    def is_data_file(self, file):
-        for pattern in self.file_patterns:
-            if fnmatch.fnmatch(file, pattern):
-                return True
-        return False
 
     def is_config_file(self, file):
         return file == self.config_file or file == self.keyword_file
@@ -222,7 +212,7 @@ class ACDSeeConfig(BaseConfig):
     def dump(self):
         super().dump()
         #  print(color("keywords_:", fg='green'))
-        #  pp.pprint(self._keywords)
+        #  pp.pprint(self._keyword_hash)
         #  print(color("people:", fg='green'))
         #  pp.pprint(self._people)
         #  print(color("exclude:", fg='green'))
@@ -230,18 +220,11 @@ class ACDSeeConfig(BaseConfig):
 
 
 class DxoConfig(BaseConfig):
-    def __init__(self):
-        super().__init__('dxo-helper')
+    def __init__(self, options):
+        super().__init__('dxo-helper', options)
         self.load()
 
-    def _load_args(self):
-        parser = self._create_parser()
-        parser.add_argument("filename", nargs="*",
-                            help="files to update, no files enters watching mode")
-        self._args = parser.parse_args()
-
     def load(self):
-        self._load_args()
         self._load_config()
         self._setup_output()
 
@@ -252,7 +235,3 @@ class DxoConfig(BaseConfig):
     @property
     def models(self):
         return self._config.get('models', {})
-
-    @property
-    def file_names(self):
-        return self._args.filename
