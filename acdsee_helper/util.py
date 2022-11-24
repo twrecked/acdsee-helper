@@ -7,7 +7,9 @@ def remove_duplicates(messy_list):
 
 
 def to_list(possible_list):
-    if type(possible_list) is list:
+    if possible_list is None:
+        return []
+    elif type(possible_list) is list:
         return possible_list
     else:
         return [possible_list]

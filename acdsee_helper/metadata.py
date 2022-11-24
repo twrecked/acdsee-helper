@@ -39,11 +39,13 @@ class MetaData:
         self._msg = ''
         self._config = config
         self._file_name = file_name
+        self._image = None
+        self._unknowns = set()
+        self._pp = pprint.PrettyPrinter(indent=4)
+
         self._image = pyexiv2.Image(file_name)
         self._exif = self._image.read_exif()
         self._data = self._image.read_xmp()
-        self._unknowns = set()
-        self._pp = pprint.PrettyPrinter(indent=4)
 
         self._old_data = {}
         self._new_data = {}
@@ -53,7 +55,8 @@ class MetaData:
                 self._new_data[keyword] = self._data[keyword]
 
     def __del__(self):
-        self._image.close()
+        if self._image is not None:
+            self._image.close()
 
     def _parse_area(self):
         people = []
@@ -108,11 +111,10 @@ class MetaData:
 
     @property
     def get_all_keywords(self):
-        keywords = self._data.get(ACDSEE_KEYWORDS_TAG, [])
-        lkeywords = self._new_data.get(LR_SUBJECT_TAG, [])
+        keywords = to_list(self._data.get(ACDSEE_KEYWORDS_TAG, []))
+        lkeywords = to_list(self._new_data.get(LR_SUBJECT_TAG, []))
         apeople, akeywords = self._parse_area()
-        keywords = remove_duplicates(keywords + lkeywords + akeywords)
-        return keywords
+        return remove_duplicates(keywords + lkeywords + akeywords)
 
     @property
     def get_subjects(self):

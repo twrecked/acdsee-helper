@@ -59,7 +59,7 @@ class BaseConfig:
         pp.pprint(self._config)
 
 
-class HelperConfig(BaseConfig):
+class ACDSeeConfig(BaseConfig):
     def __init__(self, options):
         super().__init__('acdsee-helper', options)
         self._keywords = {}
@@ -168,6 +168,10 @@ class HelperConfig(BaseConfig):
         return self._config.get('global', {}).get('keywords-location-included', True)
 
     @property
+    def keywords(self):
+        return keywords.hash_to_keywords(self._keywords)
+
+    @property
     def keywords_excluded(self):
         return self._config.get('global', {}).get('keywords-excluded', [])
 
@@ -198,7 +202,7 @@ class HelperConfig(BaseConfig):
     @property
     def file_patterns(self):
         return self._config.get('global', {}).get('file-patterns',
-                                                  ["*.xmp", "*.tif", "*.tiff", "*.jpg", "*.jpeg"])
+                                                  ["*.xmp", "*.tif", "*.tiff", "*.jpg", "*.jpeg", "*.dng"])
 
     @property
     def keyword_file(self):
