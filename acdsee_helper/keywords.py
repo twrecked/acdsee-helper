@@ -12,7 +12,7 @@ We store and manipulate the keywords in several format.
 - acdsee; a tab separated list, this comes from the exported keyword file
 - dictionary; as a dictionary with None for empty branches, we build this from
   the previous entries
-- keywords: list of '|' symbol separated hierarchical keywords, we build this from
+- keywords: set of '|' symbol separated hierarchical keywords, we build this from
   the dictionary
 """
 
