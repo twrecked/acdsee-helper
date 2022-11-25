@@ -46,6 +46,7 @@ class MetaData:
         self._image = pyexiv2.Image(file_name)
         self._exif = self._image.read_exif()
         self._data = self._image.read_xmp()
+        self._iptc = self._image.read_iptc()
 
         self._old_data = {}
         self._new_data = {}
@@ -53,6 +54,9 @@ class MetaData:
             if keyword in self._data:
                 self._old_data[keyword] = self._data[keyword]
                 self._new_data[keyword] = self._data[keyword]
+            if keyword in self._iptc:
+                self._old_data[keyword] = self._iptc[keyword]
+                self._new_data[keyword] = self._iptc[keyword]
 
     def __del__(self):
         if self._image is not None:
@@ -203,14 +207,22 @@ class MetaData:
             geo_tags = locator.get_exif_info((latitude, longitude))
             if geo_tags:
 
-                # Convert geocode tags to exif tags. Handle empty tags smartly, if it
-                # isn't present then don't add a `None` entry.
+                # Convert geocode tags to xmp/iptc tags. Handle empty tags smartly,
+                # if it isn't present then don't add an empty entry.
                 for tag, value in geo_tags.items():
                     exif_tag = geo_tag_to_exif(tag)
+
+                    # remove location if not wanted
+                    if not self._config.keywords_location_included and tag == 'location':
+                        value = None
+
                     if value is None:
                         if exif_tag in self._old_data:
-                            self._new_data[exif_tag] = None
-                            vprint(f'removing {tag}', fg='magenta')
+                            if self._old_data[exif_tag] != '':
+                                self._new_data[exif_tag] = ''
+                                vprint(f'removing {tag}', fg='magenta')
+                            else:
+                                vprint(f'ignoring blank {tag}', fg='magenta')
                         else:
                             vprint(f'ignoring removed {tag}', fg='magenta')
                     else:
@@ -233,15 +245,32 @@ class MetaData:
 
     def write_changes(self, force=False):
         if force or self.needs_update:
+
+            # split into iptc and xmp specific changes
+            iptc_changes = {}
+            xmp_changes = {}
+            for tag, value in self._new_data.items():
+                if tag.lower().startswith('iptc'):
+                    iptc_changes[tag] = value
+                else:
+                    xmp_changes[tag] = value
+
             vvprint(f" from\n{self._pp.pformat(self._old_data)}", fg='cyan')
-            vvprint(f" to\n{self._pp.pformat(self._new_data)}", fg='green')
+            vvprint(f" to-xmp\n{self._pp.pformat(xmp_changes)}", fg='green')
+            vvprint(f" to-iptc\n{self._pp.pformat(iptc_changes)}", fg='green')
+
             if not self._config.dry_run:
-                info(" writing changes")
-                self._image.modify_xmp(self._new_data)
+                if xmp_changes:
+                    self._image.modify_xmp(xmp_changes)
+                if iptc_changes:
+                    self._image.modify_iptc(iptc_changes)
             else:
                 self._msg = ' (but only pretending to write)'
 
             self._old_data = self._new_data
+        else:
+            vvprint(f" from and to\n{self._pp.pformat(self._old_data)}", fg='cyan')
+            self._msg = " (nothing changed, no write done)"
 
     def dump_xmp(self):
         info("xmp:")
