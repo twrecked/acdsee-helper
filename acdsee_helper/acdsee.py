@@ -50,6 +50,30 @@ class CommonCommand(click.Command):
                                                 help="Don't really do the work"))
 
 
+def tidy_unknown_people(c, keywords):
+    tidy_keywords = []
+    known_people = set()
+    unknown_people = []
+    for keyword in keywords:
+        topics = keyword.split('|')
+        pp.pprint(topics)
+        if topics[0].lower() == c.people_prefix.lower():
+            if topics[1].lower() == c.people_unknown_prefix.lower():
+                unknown_people.append(keyword)
+            else:
+                tidy_keywords.append(keyword)
+                known_people.add(topics[-1])
+        else:
+            tidy_keywords.append(keyword)
+
+    for unknown in unknown_people:
+        topics = unknown.split('|')
+        if topics[-1] not in known_people:
+            tidy_keywords.append(unknown)
+
+    return sorted(tidy_keywords)
+
+
 def fixup_image(c, file, no_geo):
     try:
         m = metadata.MetaData(c, file)
@@ -155,7 +179,7 @@ def keywords(dry_run, verbose, no_color, config_file, keyword_file, recursive, f
 
     # Remove duplicates and tidy up then output in ACDSee format.
     all_keywords = remove_duplicates(all_keywords)
-    all_keywords.sort()
+    all_keywords = tidy_unknown_people(c, all_keywords)
     khash = keywords_to_hash(all_keywords)
     print("\n".join(hash_to_acdsee(khash)))
 

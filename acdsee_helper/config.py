@@ -149,16 +149,16 @@ class ACDSeeConfig(BaseConfig):
         return self._config.get('global', {}).get('people-prefix', 'People')
 
     @property
+    def people_unknown_prefix(self):
+        return self._config.get('global', {}).get('people-unknown-prefix', 'Unknown')
+
+    @property
     def places(self):
         return self._keyword_hash.get(self.places_prefix, {})
 
     @property
     def places_prefix(self):
         return self._config.get('global', {}).get('places-prefix', 'Places')
-
-    @property
-    def people_unknown_prefix(self):
-        return self._config.get('global', {}).get('people-unknown-prefix', 'Unknown')
 
     @property
     def keywords_event_included(self):
