@@ -1,22 +1,23 @@
-import os
 import pprint
 import pyexiv2
 
 from .const import XMP_CREATOR_TOOL_TAG, ACDSEE_KEYWORDS_TAG, LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, \
     DC_SUBJECT_TAG, EXIF_GPS_LATITUDE_TAG, EXIF_GPS_LONGITUDE_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, \
     IPTC_GEO_COUNTRY_CODE_TAG, IPTC_GEO_LOCATION_TAG, PS_GEO_STATE_TAG, EXIF_MAKE_TAG, EXIF_MODEL_TAG
-from .color import info, warn, error, vprint, vvprint
+from .color import info, warn, vprint, vvprint
 from .geocode import GEOCODE_COUNTRY_CODE_TAG, GEOCODE_LOCATION_TAG, GEOCODE_CITY_TAG, GEOCODE_COUNTRY_TAG, \
     GEOCODE_STATE_TAG
 from .util import remove_duplicates, to_list
 from . import geocode
 
+
+# This is a list of all the tags we might change. We back them into `_old_data`
+# and check with `_new_data` to make sure things have really changed.
 BACKUP_TAGS = [LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, DC_SUBJECT_TAG, IPTC_GEO_COUNTRY_CODE_TAG,
                IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, PS_GEO_STATE_TAG]
 
-GEO_TAGS = [IPTC_GEO_COUNTRY_CODE_TAG, IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG,
-            PS_GEO_STATE_TAG]
 
+# Convert `geocode` tags to the EXIF/IPTC/XMP ones we are interested in.
 GEO_TAGS_TO_EXIF = {
     GEOCODE_COUNTRY_CODE_TAG: IPTC_GEO_COUNTRY_CODE_TAG,
     GEOCODE_LOCATION_TAG: IPTC_GEO_LOCATION_TAG,
@@ -48,9 +49,16 @@ class MetaData:
         self._data = self._image.read_xmp()
         self._iptc = self._image.read_iptc()
 
+        # Here we copy pieces from the 3 separate sections into a single
+        # dictionary.This simplifies the check to see if data has really
+        # changed and the code that unpacks the location data - currently
+        # location some data is IPTC based and some is XMP based.
         self._old_data = {}
         self._new_data = {}
         for keyword in BACKUP_TAGS:
+            if keyword in self._exif:
+                self._old_data[keyword] = self._exif[keyword]
+                self._new_data[keyword] = self._exif[keyword]
             if keyword in self._data:
                 self._old_data[keyword] = self._data[keyword]
                 self._new_data[keyword] = self._data[keyword]
@@ -186,7 +194,8 @@ class MetaData:
         self._image.modify_exif({EXIF_MAKE_TAG: make, EXIF_MODEL_TAG: model})
 
     def fix_up_start(self):
-        info(f"{os.path.basename(self._file_name)}:", style='bold')
+        # info(f"{os.path.basename(self._file_name)}:", style='bold')
+        info(f"{self._file_name}:", style='bold')
         self._msg = ''
 
     def fix_up_finished(self):
@@ -202,68 +211,77 @@ class MetaData:
     def fix_up_geo(self):
         info(f" processing GPS data")
         latitude, longitude = self.get_geo_coords
-        if latitude and longitude:
-            locator = geocode.get_locator(self._config)
-            geo_tags = locator.get_exif_info((latitude, longitude))
-            if geo_tags:
-
-                # Convert geocode tags to xmp/iptc tags. Handle empty tags smartly,
-                # if it isn't present then don't add an empty entry.
-                for tag, value in geo_tags.items():
-                    exif_tag = geo_tag_to_exif(tag)
-
-                    # remove location if not wanted
-                    if not self._config.keywords_location_included and tag == 'location':
-                        value = None
-
-                    if value is None:
-                        if exif_tag in self._old_data:
-                            if self._old_data[exif_tag] != '':
-                                self._new_data[exif_tag] = ''
-                                vprint(f'removing {tag}', fg='magenta')
-                            else:
-                                vprint(f'ignoring blank {tag}', fg='magenta')
-                        else:
-                            vprint(f'ignoring removed {tag}', fg='magenta')
-                    else:
-                        self._new_data[exif_tag] = value
-
-                # Build the places keywords.
-                keywords = [self._config.places_prefix]
-                for tag in ['country', 'state', 'city']:
-                    if geo_tags.get(tag) is not None:
-                        keywords.append(geo_tags.get(tag))
-                if self._config.keywords_location_included and geo_tags.get('location') is not None:
-                    keywords.append(geo_tags.get('location'))
-                if len(keywords) > 1:
-                    keyword = "|".join(keywords)
-                    self.set_keywords(self.get_keywords + [keyword])
-            else:
-                self._msg = " (couldn't get details)"
-        else:
+        if latitude is None or longitude is None:
             self._msg = " (no coords, nothing to do)"
+            return
+
+        # Hand it off to the geocoder. Make something useful comes back.
+        locator = geocode.get_locator(self._config)
+        geo_tags = locator.get_exif_info((latitude, longitude))
+        if not geo_tags:
+            self._msg = " (couldn't get details)"
+
+        # Convert geocode tags to exif/xmp/iptc tags. Handle empty tags smartly,
+        # if it isn't present then don't add an empty entry.
+        for tag, value in geo_tags.items():
+            exif_tag = geo_tag_to_exif(tag)
+
+            # XXX remove location if not wanted??
+            #  I think not having it in the keywords is enough
+            # if not self._config.keywords_location_included and tag == 'location':
+            #     value = None
+
+            if value is None:
+                if exif_tag in self._old_data:
+                    if self._old_data[exif_tag] != '':
+                        self._new_data[exif_tag] = ''
+                        vprint(f'removing {tag}', fg='magenta')
+                    else:
+                        vprint(f'ignoring blank {tag}', fg='magenta')
+                else:
+                    vprint(f'ignoring removed {tag}', fg='magenta')
+            else:
+                self._new_data[exif_tag] = value
+
+        # Build the places keywords.
+        keywords = [self._config.places_prefix]
+        for tag in ['country', 'state', 'city']:
+            if geo_tags.get(tag) is not None:
+                keywords.append(geo_tags.get(tag))
+        if self._config.keywords_location_included and geo_tags.get('location') is not None:
+            keywords.append(geo_tags.get('location'))
+        if len(keywords) > 1:
+            keyword = "|".join(keywords)
+            self.set_keywords(self.get_keywords + [keyword])
 
     def write_changes(self, force=False):
         if force or self.needs_update:
 
-            # split into iptc and xmp specific changes
-            iptc_changes = {}
+            # split into exif, xmp and iptc specific changes. As mentioned,
+            # this lets us simply places like `fix_up_geo` by not having to worry
+            # about where we put the updated tag.
+            exif_changes = {}
             xmp_changes = {}
+            iptc_changes = {}
             for tag, value in self._new_data.items():
-                if tag.lower().startswith('iptc'):
+                if tag.lower().startswith('iptc.'):
                     iptc_changes[tag] = value
-                else:
+                elif tag.lower().startswith('xmp.'):
                     xmp_changes[tag] = value
-
+                else:
+                    exif_changes[tag] = value
             vvprint(f" from\n{self._pp.pformat(self._old_data)}", fg='cyan')
+            vvprint(f" to-exif\n{self._pp.pformat(exif_changes)}", fg='green')
             vvprint(f" to-xmp\n{self._pp.pformat(xmp_changes)}", fg='green')
             vvprint(f" to-iptc\n{self._pp.pformat(iptc_changes)}", fg='green')
 
             if not self._config.dry_run:
-                if xmp_changes:
-                    self._image.modify_xmp(xmp_changes)
                 if iptc_changes:
                     self._image.modify_iptc(iptc_changes)
+                if xmp_changes:
+                    self._image.modify_xmp(xmp_changes)
+                if exif_changes:
+                    self._image.modify_exif(exif_changes)
             else:
                 self._msg = ' (but only pretending to write)'
 

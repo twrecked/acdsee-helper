@@ -1,12 +1,24 @@
-#
 
-#
+
 __name__ = "acdsee_helper"
 __version__ = "v0.1a0"
 __name_version__ = f"{__name__} {__version__}"
 
 
-# Exif/IPTC (and other) tags we are interested in.
+"""
+Exif/XMP/IPTC (and other) tags we are interested in.
+
+With `pyexiv2` these have to be read using different class methods - read_exif(),
+read_xmp(), read_iptc() - and written with different class methods - write_exif(),
+write_xmp(), write_iptc(). The prefix tells you which to use.
+
+`MetaData` uses these traits and reads all the different types into a single
+meta data dictionary. When it writes them out again it splits the dictionary
+into pieces and use the appropriate function.
+
+And yes, we have to split the location hierarchy between IPTC and PS otherwise
+they don't update correctly.
+"""
 ACDSEE_CATEGORIES_TAG = 'Xmp.acdsee.categories'
 ACDSEE_KEYWORDS_TAG = 'Xmp.acdsee.keywords'
 DC_SUBJECT_TAG = 'Xmp.dc.subject'
