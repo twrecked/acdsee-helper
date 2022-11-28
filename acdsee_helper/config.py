@@ -55,8 +55,18 @@ class BaseConfig:
         return self._config.get('global', {}).get('file-patterns',
                                                   ["*.xmp", "*.tif", "*.tiff", "*.jpg", "*.jpeg", "*.dng"])
 
+    @property
+    def excluded_patterns(self):
+        return self._config.get('global', {}).get('excluded-patterns', [])
+
     def is_data_file(self, file):
         for pattern in self.file_patterns:
+            if fnmatch.fnmatch(file, pattern):
+                return True
+        return False
+
+    def is_excluded_file(self, file):
+        for pattern in self.excluded_patterns:
             if fnmatch.fnmatch(file, pattern):
                 return True
         return False
@@ -205,6 +215,10 @@ class ACDSeeConfig(BaseConfig):
         if self._options['keyword_file'] is not None:
             return self._options['keyword_file']
         return self._config.get('global', {}).get('keywords-file', None)
+
+    @property
+    def is_recursive(self):
+        return self._options.get('recursive', False)
 
     def is_config_file(self, file):
         return file == self.config_file or file == self.keyword_file

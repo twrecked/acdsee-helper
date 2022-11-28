@@ -6,33 +6,12 @@ from watchdog.observers import Observer
 
 from . import config
 from . import metadata
-from .color import vprint, vvprint, error
+from .color import vprint, vvprint, error, info
 from .keywords import keywords_to_hash, hash_to_acdsee
 from . import changes
 from .util import file_age, remove_duplicates
 
 pp = pprint.PrettyPrinter(indent=4)
-
-options = {
-    'dry_run': False,
-    'verbose': 0,
-    'no_color': False,
-    'config_file': None,
-    'keyword_file': None,
-}
-
-
-def build_options(dry_run, verbose, no_color, config_file, keyword_file):
-    if dry_run is not None:
-        options['dry_run'] = dry_run
-    if verbose is not None:
-        options['verbose'] = verbose
-    if no_color is not None:
-        options['no_color'] = no_color
-    if config_file is not None:
-        options['config_file'] = config_file
-    if keyword_file is not None:
-        options['keyword_file'] = keyword_file
 
 
 class CommonCommand(click.Command):
@@ -50,15 +29,40 @@ class CommonCommand(click.Command):
                                                 help="Don't really do the work"))
 
 
-def tidy_unknown_people(c, keywords):
+options = {
+    'dry_run': False,
+    'verbose': 0,
+    'no_color': False,
+    'config_file': None,
+    'keyword_file': None,
+    'recursive': False,
+}
+
+
+def _build_options(dry_run, verbose, no_color, config_file, keyword_file, recursive=None):
+    if dry_run is not None:
+        options['dry_run'] = dry_run
+    if verbose is not None:
+        options['verbose'] = verbose
+    if no_color is not None:
+        options['no_color'] = no_color
+    if config_file is not None:
+        options['config_file'] = config_file
+    if keyword_file is not None:
+        options['keyword_file'] = keyword_file
+    if recursive is not None:
+        options['recursive'] = recursive
+
+
+def _tidy_unknown_people(cfg, keywords):
     tidy_keywords = []
     known_people = set()
     unknown_people = []
     for keyword in keywords:
         topics = keyword.split('|')
         pp.pprint(topics)
-        if topics[0].lower() == c.people_prefix.lower():
-            if topics[1].lower() == c.people_unknown_prefix.lower():
+        if topics[0].lower() == cfg.people_prefix.lower():
+            if topics[1].lower() == cfg.people_unknown_prefix.lower():
                 unknown_people.append(keyword)
             else:
                 tidy_keywords.append(keyword)
@@ -74,9 +78,9 @@ def tidy_unknown_people(c, keywords):
     return sorted(tidy_keywords)
 
 
-def fixup_image(c, file, no_geo):
+def _fixup_image(cfg, file, no_geo):
     try:
-        m = metadata.MetaData(c, file)
+        m = metadata.MetaData(cfg, file)
         m.fix_up_start()
         m.fix_up()
         if no_geo:
@@ -87,12 +91,23 @@ def fixup_image(c, file, no_geo):
         m.fix_up_finished()
     except Exception as e:
         error(f"problem reading {file} ({str(e)}")
-        return []
 
 
-def get_keywords(c, file, no_fix, no_geo):
+def _dump_image(cfg, file, no_exif, no_xmp):
     try:
-        m = metadata.MetaData(c, file)
+        m = metadata.MetaData(cfg, file)
+        info(f"{file}:", style='bold')
+        if not no_xmp:
+            m.dump_xmp()
+        if not no_exif:
+            m.dump_exif()
+    except Exception as e:
+        error(f"problem reading {file} ({str(e)}")
+
+
+def _get_keywords(cfg, file, no_fix, no_geo, all_keywords):
+    try:
+        m = metadata.MetaData(cfg, file)
         m.fix_up_start()
         if no_fix:
             vvprint('skipping tag fix')
@@ -102,10 +117,47 @@ def get_keywords(c, file, no_fix, no_geo):
             vvprint('skipping GPS to location lookup')
         else:
             m.fix_up_geo()
-        return m.get_all_keywords
+        all_keywords[:] = remove_duplicates(all_keywords + m.get_all_keywords)
     except Exception as e:
         error(f"problem reading {file} ({str(e)}")
-        return []
+
+
+def _find_keyword(cfg, file, keyword, no_fix, no_geo, found_in):
+    try:
+        m = metadata.MetaData(cfg, file)
+        m.fix_up_start()
+        if no_fix:
+            vvprint('skipping tag fix')
+        else:
+            m.fix_up()
+        if no_geo:
+            vvprint('skipping GPS to location lookup')
+        else:
+            m.fix_up_geo()
+        for possible_keyword in m.get_all_keywords:
+            if keyword in possible_keyword:
+                found_in.add(file)
+                return
+    except Exception as e:
+        error(f"problem reading {file} ({str(e)}")
+    return
+
+
+def _walk(config, files_or_dirs, callback, **kwargs):
+    for file_or_dir in files_or_dirs:
+        if os.path.isdir(file_or_dir) and config.is_recursive:
+            for root, dirs, files in os.walk(file_or_dir):
+                for file in files:
+                    file = f"{root}/{file}"
+                    if config.is_excluded_file(file):
+                        vvprint(f"ignoring excluded {file}")
+                        continue
+                    if config.is_data_file(file):
+                        callback(cfg=config, file=file, **kwargs)
+        elif config.is_data_file(file_or_dir):
+            callback(cfg=config, file=file_or_dir, **kwargs)
+        else:
+            vvprint(f"ignoring {file_or_dir}")
 
 
 @click.group()
@@ -120,19 +172,10 @@ def cli():
               help="Descend into directories")
 @click.argument('files_or_dirs', required=True, nargs=-1)
 def fix(dry_run, verbose, no_color, config_file, keyword_file, files_or_dirs, no_geo, recursive):
-    build_options(dry_run, verbose, no_color, config_file, keyword_file)
-    c = config.ACDSeeConfig(options)
+    _build_options(dry_run, verbose, no_color, config_file, keyword_file, recursive)
+    cfg = config.ACDSeeConfig(options)
 
-    for file_or_dir in files_or_dirs:
-        if os.path.isdir(file_or_dir) and recursive:
-            for root, dirs, files in os.walk(file_or_dir):
-                for file in files:
-                    file = f"{root}/{file}"
-                    if c.is_data_file(file):
-                        fixup_image(c, file, no_geo)
-        else:
-            if c.is_data_file(file_or_dir):
-                fixup_image(c, file_or_dir, no_geo)
+    _walk(cfg, files_or_dirs, _fixup_image, no_geo=no_geo)
 
 
 @cli.command(cls=CommonCommand)
@@ -140,48 +183,60 @@ def fix(dry_run, verbose, no_color, config_file, keyword_file, files_or_dirs, no
               help="Only dump exif information")
 @click.option("-X", "--no-xmp", default=False, is_flag=True,
               help="Only dump xmp information")
-@click.argument('filenames', required=True, nargs=-1)
-def dump(dry_run, verbose, no_color, config_file, keyword_file, filenames, no_exif, no_xmp):
-    build_options(dry_run, verbose, no_color, config_file, keyword_file)
-    c = config.ACDSeeConfig(options)
+@click.option("-r", "--recursive", default=False, is_flag=True,
+              help="Descend into directories")
+@click.argument('files_or_dirs', required=True, nargs=-1)
+def dump(dry_run, verbose, no_color, config_file, keyword_file, files_or_dirs, recursive, no_exif, no_xmp):
+    _build_options(dry_run, verbose, no_color, config_file, keyword_file, recursive)
+    cfg = config.ACDSeeConfig(options)
 
-    for file in filenames:
-        m = metadata.MetaData(c, file)
-        if not no_xmp:
-            m.dump_xmp()
-        if not no_exif:
-            m.dump_exif()
+    _walk(cfg, files_or_dirs, _dump_image, no_exif=no_exif, no_xmp=no_xmp)
+
+
+@cli.command(cls=CommonCommand)
+@click.option("-F", "--no-fix", default=False, is_flag=True,
+              help="Use keywords as they are.")
+@click.option("-G", "--no-geo", default=False, is_flag=True,
+              help="Disable GPS to location look up.")
+@click.option("-r", "--recursive", default=False, is_flag=True,
+              help="Descend into directories")
+@click.argument('files_or_dirs', required=True, nargs=-1)
+def keywords(dry_run, verbose, no_color, config_file, keyword_file, no_fix, no_geo, recursive, files_or_dirs):
+    _build_options(dry_run, verbose, no_color, config_file, keyword_file, recursive)
+    cfg = config.ACDSeeConfig(options)
+
+    all_keywords = []
+    _walk(cfg, files_or_dirs, _get_keywords, no_fix=no_fix, no_geo=no_geo, all_keywords=all_keywords)
+
+    # If given current list them merge with it.
+    if keyword_file is not None:
+        all_keywords = all_keywords + list(cfg.keywords)
+
+    # Remove duplicates and tidy up then output in ACDSee format.
+    all_keywords = remove_duplicates(all_keywords)
+    all_keywords = _tidy_unknown_people(cfg, all_keywords)
+    khash = keywords_to_hash(all_keywords)
+    print("\n".join(hash_to_acdsee(khash)))
 
 
 @cli.command(cls=CommonCommand)
 @click.option("-r", "--recursive", default=False, is_flag=True,
               help="Descend into directories")
+@click.argument('keyword', required=True, nargs=1)
 @click.argument('files_or_dirs', required=True, nargs=-1)
-def keywords(dry_run, verbose, no_color, config_file, keyword_file, recursive, files_or_dirs):
-    build_options(dry_run, verbose, no_color, config_file, keyword_file)
-    c = config.ACDSeeConfig(options)
+def find(dry_run, verbose, no_color, config_file, keyword_file, recursive, keyword, files_or_dirs):
+    _build_options(dry_run, verbose, no_color, config_file, keyword_file, recursive)
+    cfg = config.ACDSeeConfig(options)
 
-    all_keywords = []
-    for file_or_dir in files_or_dirs:
-        if os.path.isdir(file_or_dir) and recursive:
-            for root, dirs, files in os.walk(file_or_dir):
-                for file in files:
-                    file = f"{root}/{file}"
-                    if c.is_data_file(file):
-                        all_keywords = remove_duplicates(all_keywords + get_keywords(c, file, False, False))
-        else:
-            if c.is_data_file(file_or_dir):
-                all_keywords = remove_duplicates(all_keywords + get_keywords(c, file_or_dir, False, False))
+    found_in = set()
+    _walk(cfg, files_or_dirs, _find_keyword, no_fix=False, no_geo=False, keyword=keyword, found_in=found_in)
 
-    # If given current list them merge with it.
-    if keyword_file is not None:
-        all_keywords = all_keywords + list(c.keywords)
-
-    # Remove duplicates and tidy up then output in ACDSee format.
-    all_keywords = remove_duplicates(all_keywords)
-    all_keywords = tidy_unknown_people(c, all_keywords)
-    khash = keywords_to_hash(all_keywords)
-    print("\n".join(hash_to_acdsee(khash)))
+    if found_in:
+        print("Keyword found in the following files:")
+        for file in found_in:
+            print(f"  {file}")
+    else:
+        print("Keyword not found any files.")
 
 
 @cli.command(cls=CommonCommand)
@@ -189,19 +244,19 @@ def keywords(dry_run, verbose, no_color, config_file, keyword_file, recursive, f
               help="Disable GPS to  location look up")
 @click.argument('base', required=True, nargs=1, default=".")
 def watch(dry_run, verbose, no_color, config_file, keyword_file, no_geo, base):
-    build_options(dry_run, verbose, no_color, config_file, keyword_file)
-    c = config.ACDSeeConfig(options)
+    _build_options(dry_run, verbose, no_color, config_file, keyword_file)
+    cfg = config.ACDSeeConfig(options)
 
     # Add watchers for directories and configuration.
-    exif_handler = changes.ExifFileHandler(c)
-    config_handler = changes.AnyFileHandler(c)
+    exif_handler = changes.ExifFileHandler(cfg)
+    config_handler = changes.AnyFileHandler(cfg)
 
     observer = Observer()
     observer.schedule(exif_handler, base, recursive=True)
-    if c.config_file is not None:
-        observer.schedule(config_handler, c.config_file)
-    if c.keyword_file is not None:
-        observer.schedule(config_handler, c.keyword_file)
+    if cfg.config_file is not None:
+        observer.schedule(config_handler, cfg.config_file)
+    if cfg.keyword_file is not None:
+        observer.schedule(config_handler, cfg.keyword_file)
     observer.start()
 
     try:
@@ -214,16 +269,16 @@ def watch(dry_run, verbose, no_color, config_file, keyword_file, no_geo, base):
 
             for file in files:
                 try:
-                    if file_age(file) < c.update_delay:
+                    if file_age(file) < cfg.update_delay:
                         vvprint(f"{file}: too young")
                         too_soon.add(file)
                         continue
 
-                    if c.is_data_file(file):
+                    if cfg.is_data_file(file):
                         vprint(f"would check {file}")
-                        fixup_image(c, file, no_geo)
-                    if c.is_config_file(file):
-                        c.load()
+                        _fixup_image(cfg, file, no_geo)
+                    if cfg.is_config_file(file):
+                        cfg.load()
 
                 except Exception as e:
                     error(f"{file}: error ({str(e)})")

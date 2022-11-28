@@ -158,9 +158,9 @@ class GoogleGeoLocator(BaseGeoLocator):
                 country_code = component['short_name']
         if country_code == '':
             error(f'error, no country found')
-            return {}
+            return None
 
-        # Pick the handler to map geolocator to the components we are intersted
+        # Pick the handler to map geolocator to the components we are interested
         # in.
         mapping = {}
         for mapping in self.ADDRESS_MAPPING:
