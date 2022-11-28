@@ -71,6 +71,10 @@ class BaseConfig:
                 return True
         return False
 
+    @property
+    def is_recursive(self):
+        return self._options.get('recursive', False)
+
     def dump(self):
         print(color(f"options (for {self.name}):", fg='green'))
         pp.pprint(self._options)
@@ -215,10 +219,6 @@ class ACDSeeConfig(BaseConfig):
         if self._options['keyword_file'] is not None:
             return self._options['keyword_file']
         return self._config.get('global', {}).get('keywords-file', None)
-
-    @property
-    def is_recursive(self):
-        return self._options.get('recursive', False)
 
     def is_config_file(self, file):
         return file == self.config_file or file == self.keyword_file

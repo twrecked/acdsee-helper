@@ -9,9 +9,7 @@ from . import metadata
 from .color import vprint, vvprint, error, info
 from .keywords import keywords_to_hash, hash_to_acdsee
 from . import changes
-from .util import file_age, remove_duplicates
-
-pp = pprint.PrettyPrinter(indent=4)
+from .util import file_age, remove_duplicates, walk
 
 
 class CommonCommand(click.Command):
@@ -28,6 +26,8 @@ class CommonCommand(click.Command):
         self.params.insert(0, click.core.Option(('-d', '--dry-run'), default=False, is_flag=True,
                                                 help="Don't really do the work"))
 
+
+pp = pprint.PrettyPrinter(indent=4)
 
 options = {
     'dry_run': False,
@@ -143,23 +143,6 @@ def _find_keyword(cfg, file, keyword, no_fix, no_geo, found_in):
     return
 
 
-def _walk(config, files_or_dirs, callback, **kwargs):
-    for file_or_dir in files_or_dirs:
-        if os.path.isdir(file_or_dir) and config.is_recursive:
-            for root, dirs, files in os.walk(file_or_dir):
-                for file in files:
-                    file = f"{root}/{file}"
-                    if config.is_excluded_file(file):
-                        vvprint(f"ignoring excluded {file}")
-                        continue
-                    if config.is_data_file(file):
-                        callback(cfg=config, file=file, **kwargs)
-        elif config.is_data_file(file_or_dir):
-            callback(cfg=config, file=file_or_dir, **kwargs)
-        else:
-            vvprint(f"ignoring {file_or_dir}")
-
-
 @click.group()
 def cli():
     pass
@@ -175,7 +158,7 @@ def fix(dry_run, verbose, no_color, config_file, keyword_file, files_or_dirs, no
     _build_options(dry_run, verbose, no_color, config_file, keyword_file, recursive)
     cfg = config.ACDSeeConfig(options)
 
-    _walk(cfg, files_or_dirs, _fixup_image, no_geo=no_geo)
+    walk(cfg, files_or_dirs, _fixup_image, no_geo=no_geo)
 
 
 @cli.command(cls=CommonCommand)
@@ -190,7 +173,7 @@ def dump(dry_run, verbose, no_color, config_file, keyword_file, files_or_dirs, r
     _build_options(dry_run, verbose, no_color, config_file, keyword_file, recursive)
     cfg = config.ACDSeeConfig(options)
 
-    _walk(cfg, files_or_dirs, _dump_image, no_exif=no_exif, no_xmp=no_xmp)
+    walk(cfg, files_or_dirs, _dump_image, no_exif=no_exif, no_xmp=no_xmp)
 
 
 @cli.command(cls=CommonCommand)
@@ -206,7 +189,7 @@ def keywords(dry_run, verbose, no_color, config_file, keyword_file, no_fix, no_g
     cfg = config.ACDSeeConfig(options)
 
     all_keywords = []
-    _walk(cfg, files_or_dirs, _get_keywords, no_fix=no_fix, no_geo=no_geo, all_keywords=all_keywords)
+    walk(cfg, files_or_dirs, _get_keywords, no_fix=no_fix, no_geo=no_geo, all_keywords=all_keywords)
 
     # If given current list them merge with it.
     if keyword_file is not None:
@@ -229,7 +212,7 @@ def find(dry_run, verbose, no_color, config_file, keyword_file, recursive, keywo
     cfg = config.ACDSeeConfig(options)
 
     found_in = set()
-    _walk(cfg, files_or_dirs, _find_keyword, no_fix=False, no_geo=False, keyword=keyword, found_in=found_in)
+    walk(cfg, files_or_dirs, _find_keyword, no_fix=False, no_geo=False, keyword=keyword, found_in=found_in)
 
     if found_in:
         print("Keyword found in the following files:")
