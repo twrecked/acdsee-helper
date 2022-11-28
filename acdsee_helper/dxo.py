@@ -98,17 +98,6 @@ def fake(dry_run, verbose, no_color, config_file, files_or_dirs, recursive):
     cfg = config.DxoConfig(options)
 
     walk(cfg, files_or_dirs, _fixup_image)
-    #
-    # for file_or_dir in files_or_dirs:
-    #     if os.path.isdir(file_or_dir) and recursive:
-    #         for root, dirs, files in os.walk(file_or_dir):
-    #             for file in files:
-    #                 file = f"{root}/{file}"
-    #                 if cfg.is_data_file(file):
-    #                     fixup_image(cfg, file)
-    #     else:
-    #         if cfg.is_data_file(file_or_dir):
-    #             fixup_image(cfg, file_or_dir)
 
 
 if __name__ == '__main__':
