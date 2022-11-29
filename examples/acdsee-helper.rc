@@ -1,26 +1,74 @@
 
 global:
+
+  ## Events
+  # This is the event keyword prefix.
   event-prefix: Events
+
+  # How many events to remove when creating the IPTC event field.
   event-tag-count: 1
+
+  # How to separate the events in the ITC event field.
   event-separator: ', '
 
+  ## Places
+  places-prefix: Places
+
+  ## People
+  # This is the people keyword prefix.
+  people-prefix: People
+
+  # When creating People entries the person in  the image is cross referenced
+  # with the keywords from the acdsee file or people section from this file.
+  # This group will be used if the person isn't known.
+  people-unknown-prefix: Unknown
+
+  ## Keyword Handling
+  # Copy thge event into the keyword list.
+  keywords-event-included: True
+
+  # Copy people into the keyword list.
+  keywords-people-included: True
+
+  # Include location in place keyword. This can include street names. 
+  keywords-location-included: False
+
+  # Ignore these keywords when creating the LR hierarchy tags.
+  keywords-excluded:
+    - private|
+
+  ## Model changing.
+  # When changing models, put new files in this directory.
+  fake-dir: '[Faked]'
+
+
+  ## geocode lookup
+  # We currently only support the geocode backend
+  geocode-backend: google
+  geocode-token: XXXXXXXXXXXXXXXXX
+
+  # Don't look up addresses that are closes than 200m from another lookup.
+  geocode-coalesce: 200
+
+  # Unicode squash. Sometimes locations come back with and without accents,
+  # this squashes the accents.
+  geocode-unidecode: True
+
+
+  ## Scan/Walk
+  # During a walk or scan ignore files matching these patterns.
   excluded-patterns:
     - '*/?Originals?/*'
     - '*/?Developed?/*'
     - '*/?Fixed?/*'
 
-  places-prefix: Places
 
-  people-prefix: People
-  people-unknown-prefix: Unknown
-
-  keywords-event-included: True
-  keywords-people-included: True
-  keywords-location-included: False
-  keywords-excluded:
-    - private|
-
-  geocode-backend: google
-  geocode-token: XXXXXXXXXXXXXXXXX
-  geocode-coalesce: 200
-  geocode-unidecode: True
+## DXO helper
+# Map of "from models" to "to models".
+models:
+  moto g stylus 5G (2022):
+      make: Apple
+      model: iPhone 8 Plus
+  Olympus E500:
+      make: Olympus
+      model: E-510
