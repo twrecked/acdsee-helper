@@ -1,6 +1,27 @@
 
 global:
 
+  ## File Patterns
+  # Only look at files that match this pattern.
+  file-patterns:
+    - "*.xmp"
+    - "*.tif"
+    - "*.tiff"
+    - "*.jpg"
+    - "*.jpeg"
+    - "*.dng"
+
+  ## Excluded Patterns
+  # During a walk or scan ignore files matching these patterns.
+  excluded-patterns:
+    - '*/?Originals?/*'
+    - '*/?Developed?/*'
+    - '*/?Fixed?/*'
+
+
+# ACDSEE helper
+acdsee:
+
   ## Events
   # This is the event keyword prefix.
   event-prefix: Events
@@ -37,11 +58,6 @@ global:
   keywords-excluded:
     - private|
 
-  ## Model changing.
-  # When changing models, put new files in this directory.
-  fake-dir: '[Faked]'
-
-
   ## geocode lookup
   # We currently only support the geocode backend
   geocode-backend: google
@@ -54,21 +70,27 @@ global:
   # this squashes the accents.
   geocode-unidecode: True
 
-
-  ## Scan/Walk
-  # During a walk or scan ignore files matching these patterns.
-  excluded-patterns:
-    - '*/?Originals?/*'
-    - '*/?Developed?/*'
-    - '*/?Fixed?/*'
+  # Extra people.
+  people:
+    - Family:
+        - Person One
+        - Person Two
+    - Friends:
+        - Person Three
+        - Person Four
 
 
 ## DXO helper
-# Map of "from models" to "to models".
-models:
-  moto g stylus 5G (2022):
-      make: Apple
-      model: iPhone 8 Plus
-  Olympus E500:
-      make: Olympus
-      model: E-510
+dxo:
+
+  # When changing models, put new files in this directory.
+  fake-dir: '[Faked]'
+
+  # Map of "from models" to "to models".
+  models:
+    moto g stylus 5G (2022):
+        make: Apple
+        model: iPhone 8 Plus
+    Olympus E500:
+        make: Olympus
+        model: E-510

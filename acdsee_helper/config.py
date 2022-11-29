@@ -145,15 +145,15 @@ class ACDSeeConfig(BaseConfig):
 
     @property
     def event_prefix(self):
-        return self._config.get('global', {}).get('event-prefix', 'Events')
+        return self._config.get('acdsee', {}).get('event-prefix', 'Events')
 
     @property
     def event_tag_count(self):
-        return self._config.get('global', {}).get('event-tag-count', -1)
+        return self._config.get('acdsee', {}).get('event-tag-count', -1)
 
     @property
     def event_separator(self):
-        return self._config.get('global', {}).get('event-separator', ', ')
+        return self._config.get('acdsee', {}).get('event-separator', ', ')
 
     @property
     def people(self):
@@ -161,11 +161,11 @@ class ACDSeeConfig(BaseConfig):
 
     @property
     def people_prefix(self):
-        return self._config.get('global', {}).get('people-prefix', 'People')
+        return self._config.get('acdsee', {}).get('people-prefix', 'People')
 
     @property
     def people_unknown_prefix(self):
-        return self._config.get('global', {}).get('people-unknown-prefix', 'Unknown')
+        return self._config.get('acdsee', {}).get('people-unknown-prefix', 'Unknown')
 
     @property
     def places(self):
@@ -173,19 +173,19 @@ class ACDSeeConfig(BaseConfig):
 
     @property
     def places_prefix(self):
-        return self._config.get('global', {}).get('places-prefix', 'Places')
+        return self._config.get('acdsee', {}).get('places-prefix', 'Places')
 
     @property
     def keywords_event_included(self):
-        return self._config.get('global', {}).get('keywords-event-included', True)
+        return self._config.get('acdsee', {}).get('keywords-event-included', True)
 
     @property
     def keywords_people_included(self):
-        return self._config.get('global', {}).get('keywords-people-included', True)
+        return self._config.get('acdsee', {}).get('keywords-people-included', True)
 
     @property
     def keywords_location_included(self):
-        return self._config.get('global', {}).get('keywords-location-included', True)
+        return self._config.get('acdsee', {}).get('keywords-location-included', True)
 
     @property
     def keywords(self):
@@ -193,33 +193,33 @@ class ACDSeeConfig(BaseConfig):
 
     @property
     def keywords_excluded(self):
-        return self._config.get('global', {}).get('keywords-excluded', [])
+        return self._config.get('acdsee', {}).get('keywords-excluded', [])
 
     @property
     def geocode_backend(self):
-        return self._config.get('global', {}).get('geocode-backend', [])
+        return self._config.get('acdsee', {}).get('geocode-backend', [])
 
     @property
     def geocode_token(self):
-        return self._config.get('global', {}).get('geocode-token', [])
+        return self._config.get('acdsee', {}).get('geocode-token', [])
 
     @property
     def geocode_coalesce(self):
-        return self._config.get('global', {}).get('geocode-coalesce', 250)
+        return self._config.get('acdsee', {}).get('geocode-coalesce', 250)
 
     @property
     def geocode_unidecode(self):
-        return self._config.get('global', {}).get('geocode-unidecode', False)
+        return self._config.get('acdsee', {}).get('geocode-unidecode', False)
 
     @property
     def update_delay(self):
-        return self._config.get('global', {}).get('update-delay', 5)
+        return self._config.get('acdsee', {}).get('update-delay', 5)
 
     @property
     def keyword_file(self):
         if self._options['keyword_file'] is not None:
             return self._options['keyword_file']
-        return self._config.get('global', {}).get('keywords-file', None)
+        return self._config.get('acdsee', {}).get('keywords-file', None)
 
     def is_config_file(self, file):
         return file == self.config_file or file == self.keyword_file
@@ -245,8 +245,8 @@ class DxoConfig(BaseConfig):
 
     @property
     def fake_dir(self):
-        return self._config.get('global', {}).get('fake-dir', None)
+        return self._config.get('dxo', {}).get('fake-dir', None)
 
     @property
     def models(self):
-        return self._config.get('models', {})
+        return self._config.get('dxo', {})

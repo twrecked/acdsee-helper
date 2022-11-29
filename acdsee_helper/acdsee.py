@@ -149,6 +149,13 @@ def cli():
 
 
 @cli.command(cls=CommonCommand)
+def cfg(dry_run, verbose, no_color, config_file, keyword_file):
+    _build_options(dry_run, verbose, no_color, config_file, keyword_file)
+    cfg = config.ACDSeeConfig(options)
+    cfg.dump()
+
+
+@cli.command(cls=CommonCommand)
 @click.option("-G", "--no-geo", default=False, is_flag=True,
               help="Disable GPS to  location look up")
 @click.option("-r", "--recursive", default=False, is_flag=True,
