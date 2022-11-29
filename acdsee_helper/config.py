@@ -1,4 +1,5 @@
 
+import sys
 import pprint
 import yaml
 import fnmatch
@@ -17,7 +18,7 @@ class BaseConfig:
 
     def _setup_output(self):
         set_verbosity(self._options['verbose'])
-        if self._options['no_color']:
+        if self._options['no_color'] or not sys.stdout.isatty():
             disable_color()
         else:
             enable_color()
