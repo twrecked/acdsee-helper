@@ -1,0 +1,26 @@
+
+global:
+  event-prefix: Events
+  event-tag-count: 1
+  event-separator: ', '
+
+  excluded-patterns:
+    - '*/?Originals?/*'
+    - '*/?Developed?/*'
+    - '*/?Fixed?/*'
+
+  places-prefix: Places
+
+  people-prefix: People
+  people-unknown-prefix: Unknown
+
+  keywords-event-included: True
+  keywords-people-included: True
+  keywords-location-included: False
+  keywords-excluded:
+    - private|
+
+  geocode-backend: google
+  geocode-token: XXXXXXXXXXXXXXXXX
+  geocode-coalesce: 200
+  geocode-unidecode: True
