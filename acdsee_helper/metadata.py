@@ -171,11 +171,15 @@ class MetaData:
             if LR_SUBJECT_TAG in self._old_data:
                 vprint(f" removing {LR_SUBJECT_TAG}", fg='magenta')
                 self._new_data[LR_SUBJECT_TAG] = None
+        else:
+            self._new_data[LR_SUBJECT_TAG] = new_keywords
+
+    def set_acdsee_keywords(self, new_keywords):
+        if not new_keywords:
             if ACDSEE_KEYWORDS_TAG in self._old_data:
                 vprint(f" removing {ACDSEE_KEYWORDS_TAG}", fg='magenta')
                 self._new_data[ACDSEE_KEYWORDS_TAG] = None
         else:
-            self._new_data[LR_SUBJECT_TAG] = new_keywords
             self._new_data[ACDSEE_KEYWORDS_TAG] = new_keywords
 
     def set_subjects(self, new_subjects):
@@ -209,6 +213,7 @@ class MetaData:
         info(f" processing tags")
         self.set_event(self.get_event)
         self.set_keywords(self.get_keywords)
+        self.set_acdsee_keywords(self.get_all_keywords)
         self.set_subjects(self.get_subjects)
         self.set_people(self.get_people)
 
@@ -257,6 +262,7 @@ class MetaData:
         if len(keywords) > 1:
             keyword = "|".join(keywords)
             self.set_keywords(self.get_keywords + [keyword])
+            self.set_acdsee_keywords(self.get_all_keywords)
 
     def write_changes(self, force=False):
         if force or self.needs_update:
