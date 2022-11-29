@@ -13,8 +13,8 @@ from . import geocode
 
 # This is a list of all the tags we might change. We back them into `_old_data`
 # and check with `_new_data` to make sure things have really changed.
-BACKUP_TAGS = [LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, DC_SUBJECT_TAG, IPTC_GEO_COUNTRY_CODE_TAG,
-               IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, PS_GEO_STATE_TAG]
+BACKUP_TAGS = [ACDSEE_KEYWORDS_TAG, LR_SUBJECT_TAG, IPTCEXT_PERSON_TAG, IPTCEXT_EVENT_TAG, DC_SUBJECT_TAG,
+               IPTC_GEO_COUNTRY_CODE_TAG, IPTC_GEO_LOCATION_TAG, PS_GEO_CITY_TAG, PS_GEO_COUNTRY_TAG, PS_GEO_STATE_TAG]
 
 
 # Convert `geocode` tags to the EXIF/IPTC/XMP ones we are interested in.
@@ -171,8 +171,12 @@ class MetaData:
             if LR_SUBJECT_TAG in self._old_data:
                 vprint(f" removing {LR_SUBJECT_TAG}", fg='magenta')
                 self._new_data[LR_SUBJECT_TAG] = None
+            if ACDSEE_KEYWORDS_TAG in self._old_data:
+                vprint(f" removing {ACDSEE_KEYWORDS_TAG}", fg='magenta')
+                self._new_data[ACDSEE_KEYWORDS_TAG] = None
         else:
             self._new_data[LR_SUBJECT_TAG] = new_keywords
+            self._new_data[ACDSEE_KEYWORDS_TAG] = new_keywords
 
     def set_subjects(self, new_subjects):
         if not new_subjects:
