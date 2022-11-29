@@ -1,4 +1,4 @@
-import os
+
 import time
 import pprint
 import click
@@ -82,11 +82,11 @@ def _fixup_image(cfg, file, no_geo):
     try:
         m = metadata.MetaData(cfg, file)
         m.fix_up_start()
-        m.fix_up()
         if no_geo:
             vvprint('skipping GPS to location lookup')
         else:
             m.fix_up_geo()
+        m.fix_up()
         m.write_changes()
         m.fix_up_finished()
     except Exception as e:
@@ -109,14 +109,14 @@ def _get_keywords(cfg, file, no_fix, no_geo, all_keywords):
     try:
         m = metadata.MetaData(cfg, file)
         m.fix_up_start()
-        if no_fix:
-            vvprint('skipping tag fix')
-        else:
-            m.fix_up()
         if no_geo:
             vvprint('skipping GPS to location lookup')
         else:
             m.fix_up_geo()
+        if no_fix:
+            vvprint('skipping tag fix')
+        else:
+            m.fix_up()
         all_keywords[:] = remove_duplicates(all_keywords + m.get_all_keywords)
     except Exception as e:
         error(f"problem reading {file} ({str(e)}")
@@ -126,14 +126,14 @@ def _find_keyword(cfg, file, keyword, no_fix, no_geo, found_in):
     try:
         m = metadata.MetaData(cfg, file)
         m.fix_up_start()
-        if no_fix:
-            vvprint('skipping tag fix')
-        else:
-            m.fix_up()
         if no_geo:
             vvprint('skipping GPS to location lookup')
         else:
             m.fix_up_geo()
+        if no_fix:
+            vvprint('skipping tag fix')
+        else:
+            m.fix_up()
         for possible_keyword in m.get_all_keywords:
             if keyword in possible_keyword:
                 found_in.add(file)

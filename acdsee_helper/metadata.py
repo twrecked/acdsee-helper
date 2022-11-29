@@ -96,7 +96,7 @@ class MetaData:
     @property
     def get_event(self):
         # Try in keywords field.
-        for keyword in self._data.get(ACDSEE_KEYWORDS_TAG, []):
+        for keyword in self._new_data.get(ACDSEE_KEYWORDS_TAG, []):
             topics = keyword.split('|')
             if topics[0].lower() == self._config.event_prefix.lower():
                 return self._config.event_separator.join(to_list(topics[self._config.event_tag_count:]))
@@ -105,7 +105,7 @@ class MetaData:
     @property
     def get_people(self):
         people = []
-        for keyword in self._data.get(ACDSEE_KEYWORDS_TAG, []):
+        for keyword in self._new_data.get(ACDSEE_KEYWORDS_TAG, []):
             topics = keyword.split('|')
             if topics[0].lower() == self._config.people_prefix.lower():
                 people.append(topics[-1])
@@ -116,14 +116,14 @@ class MetaData:
 
     @property
     def get_keywords(self):
-        keywords = self._data.get(ACDSEE_KEYWORDS_TAG, [])
+        keywords = self._new_data.get(ACDSEE_KEYWORDS_TAG, [])
         apeople, akeywords = self._parse_area()
         keywords = self._config.remove_hidden(remove_duplicates(keywords + akeywords))
         return keywords
 
     @property
     def get_all_keywords(self):
-        keywords = to_list(self._data.get(ACDSEE_KEYWORDS_TAG, []))
+        keywords = to_list(self._new_data.get(ACDSEE_KEYWORDS_TAG, []))
         lkeywords = to_list(self._new_data.get(LR_SUBJECT_TAG, []))
         apeople, akeywords = self._parse_area()
         return remove_duplicates(keywords + lkeywords + akeywords)
